@@ -24,7 +24,7 @@ export const MidgardBanner = (): React.ReactElement => {
   return environmentName === 'Preprod' ? (
     <div className={`${styles.banner} ${isMidgardEnabled ? styles.enabled : styles.disabled}`}>
       <span className={styles.text}>
-        {isMidgardEnabled ? `${t('general.networks.midgard')}` : `${t('general.networks.midgard')} mode`}
+        {isMidgardEnabled ? `${t('general.networks.midgard')} mode` : `${t('general.networks.midgard')}`}
       </span>
       <Switch checked={isMidgardEnabled} onChange={handleToggle} size="default" />
     </div>
