@@ -22,6 +22,7 @@ import { Cardano, Reward } from '@cardano-sdk/core';
 import { StakePoolSortOptions } from '@lace/staking';
 import { ObservableWalletState } from '@hooks/useWalletState';
 import { Bitcoin } from '@lace/bitcoin';
+import { MidgardSlice } from './slices/midgard-slice';
 
 export enum StateStatus {
   IDLE = 'idle',
@@ -205,4 +206,5 @@ export type WalletStore = WalletActivitiesSlice &
   AssetDetailsSlice &
   UISlice &
   BlockchainProviderSlice &
-  BitcoinBlockchainProviderSlice;
+  BitcoinBlockchainProviderSlice &
+  MidgardSlice;

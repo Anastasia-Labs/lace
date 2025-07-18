@@ -6,6 +6,7 @@
   background-color: var(--bg-color-body, #fff);
   padding-left: 1px;
   padding-right: 1px;
+  flex-wrap: wrap; /* Allow wrapping to new line */
 
   .content {
     width: 100%;
@@ -34,6 +35,12 @@
         cursor: pointer;
       }
     }
+  }
+
+   .bannerContainer {
+    width: 100%; /* Force banner to new line */
+    margin: 0 size_unit(3);
+    margin-bottom: size_unit(1);
   }
 }
 
