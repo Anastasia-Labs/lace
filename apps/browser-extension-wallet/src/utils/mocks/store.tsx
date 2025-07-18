@@ -114,6 +114,8 @@ export const walletStoreMock = async (
     setDeletingWallet: jest.fn(),
     hdDiscoveryStatus: AddressesDiscoveryStatus.Idle,
     setHdDiscoveryStatus: jest.fn(),
+    isMidgardEnabled: false,
+    setMidgardMode: jest.fn(),
     ...customStore
   };
 };

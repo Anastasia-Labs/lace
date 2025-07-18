@@ -11,7 +11,8 @@ import {
   activityDetailSlice,
   uiSlice,
   blockchainProviderSlice,
-  bitcoinBlockchainProviderSlice
+  bitcoinBlockchainProviderSlice,
+  midgardSlice
 } from './slices';
 import { assetDetailsSlice } from './slices/asset-details-slice';
 import { AppMode } from '@src/utils/constants';
@@ -37,6 +38,7 @@ export const createWalletStore = (
     ...stakePoolSearchSlice({ set, get }),
     ...lockSlice({ set, get }),
     ...activityDetailSlice({ set, get }),
-    ...assetDetailsSlice({ set, get })
+    ...assetDetailsSlice({ set, get }),
+    ...midgardSlice({ set, get })
   }));
 };

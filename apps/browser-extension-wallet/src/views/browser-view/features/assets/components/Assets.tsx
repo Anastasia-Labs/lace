@@ -58,7 +58,8 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
     activityDetail,
     resetActivityState,
     blockchainProvider,
-    environmentName
+    environmentName,
+    setMidgardMode // Add this line
   } = useWalletStore();
   const popupView = appMode === APP_MODE_POPUP;
   const hiddenBalancePlaceholder = getHiddenBalancePlaceholder();
@@ -73,6 +74,17 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
   const pageSize = useItemsPageSize(LIST_ITEM_HEIGHT);
   const [listItemsAmount, setListItemsAmount] = useState(pageSize);
   const [selectedAssetId, setSelectedAssetId] = useState<string | undefined>();
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'midgardEnabled' && e.newValue !== null) {
+        setMidgardMode(JSON.parse(e.newValue)); // Use the hook directly
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [setMidgardMode]); // Add setMidgardMode to dependencies
 
   useEffect(() => {
     setListItemsAmount(pageSize);
@@ -308,6 +320,7 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
 
   return popupView ? (
     <>
+      {/* <MidgardBanner /> */}
       <ContentLayout hasCredit={fullAssetList?.length > 0}>
         <MidnightEventBanner />
         {assetsPortfolio}
