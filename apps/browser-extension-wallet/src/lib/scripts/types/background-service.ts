@@ -112,6 +112,7 @@ export type BackgroundService = {
   getAppVersion: () => Promise<string>;
   backendFailures$: BehaviorSubject<number>;
   unhandledError$: Observable<UnhandledError>;
+  reloadWallet: () => Promise<void>;
 };
 
 export type WalletMode = {

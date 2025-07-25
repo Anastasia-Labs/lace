@@ -9,6 +9,7 @@ import { setBackgroundStorage } from '@lib/scripts/background/storage';
 import { useCustomSubmitApi } from '@hooks/useCustomSubmitApi';
 import { bitcoinWalletManager } from '@lib/wallet-api-ui';
 import { useCurrentBlockchain } from '@src/multichain';
+import { useMidgardRefresh } from './useMidgardRefresh';
 
 export const useAppInit = (): void => {
   const {
@@ -26,6 +27,9 @@ export const useAppInit = (): void => {
   const walletState = useWalletState();
   const { environmentName, currentChain } = useWalletStore();
   const { getCustomSubmitApiForNetwork } = useCustomSubmitApi();
+  
+  // Initialize Midgard refresh listener
+  useMidgardRefresh();
 
   useEffect(() => {
     setWalletState(walletState);

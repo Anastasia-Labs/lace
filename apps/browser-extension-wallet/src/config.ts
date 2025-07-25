@@ -37,6 +37,7 @@ export type Config = {
   SESSION_TIMEOUT: Milliseconds;
   POSTHOG_FEATURE_FLAG_CHECK_FREQUENCY_SECONDS: number;
   MEMPOOL_URLS: Record<BitcoinNetworks, string>;
+  MIDGARD_URLS: ByNetwork<string>;
 };
 
 // eslint-disable-next-line complexity
@@ -168,6 +169,12 @@ export const config = (): Config => {
     MEMPOOL_URLS: {
       Mainnet: `${process.env.MEMPOOL_URL_MAINNET}`,
       Testnet4: `${process.env.MEMPOOL_URL_TESTNET4}`
+    },
+    MIDGARD_URLS: {
+      Mainnet: process.env.MIDGARD_URL_MAINNET || 'https://api.midgard.example.com',
+      Preprod: process.env.MIDGARD_URL_PREPROD || 'https://api.midgard.example.com',
+      Preview: process.env.MIDGARD_URL_PREVIEW || 'https://api.midgard.example.com',
+      Sanchonet: process.env.MIDGARD_URL_SANCHONET || 'https://api.midgard.example.com'
     }
   };
 };

@@ -11,6 +11,10 @@ import Bottleneck from 'bottleneck';
 import { RateLimiter } from '@cardano-sdk/cardano-services-client';
 import { ExperimentName } from '../types/feature-flags';
 
+// Global variable to track current Midgard state and force provider refresh
+let currentMidgardState: boolean | null = null;
+let providersCache: Map<Wallet.ChainName, Wallet.WalletProvidersDependencies> = new Map();
+
 export const backgroundServiceProperties: RemoteApiProperties<BackgroundService> = {
   requestMessage$: RemoteApiPropertyType.HotObservable,
   migrationState$: RemoteApiPropertyType.HotObservable,
@@ -30,7 +34,8 @@ export const backgroundServiceProperties: RemoteApiProperties<BackgroundService>
   resetStorage: RemoteApiPropertyType.MethodReturningPromise,
   getAppVersion: RemoteApiPropertyType.MethodReturningPromise,
   backendFailures$: RemoteApiPropertyType.HotObservable,
-  unhandledError$: RemoteApiPropertyType.HotObservable
+  unhandledError$: RemoteApiPropertyType.HotObservable,
+  reloadWallet: RemoteApiPropertyType.MethodReturningPromise
 };
 
 const { BLOCKFROST_CONFIGS, BLOCKFROST_RATE_LIMIT_CONFIG, SESSION_TIMEOUT } = config();
@@ -51,7 +56,40 @@ export const getProviders = async (chainName: Wallet.ChainName): Promise<Wallet.
 
   const isExperimentEnabled = (experimentName: ExperimentName) => !!(featureFlags?.[magic]?.[experimentName] ?? false);
 
-  return Wallet.createProviders({
+  // Check if Midgard is enabled from storage
+  const isMidgardEnabled = await checkMidgardEnabled();
+  
+  // Debug logging
+  console.log('🔍 Debug: Midgard enabled check:', {
+    isMidgardEnabled,
+    chainName,
+    midgardUrl: config().MIDGARD_URLS[chainName]
+  });
+  
+  // Check if Midgard state has changed and clear cache if needed
+  if (currentMidgardState !== null && currentMidgardState !== isMidgardEnabled) {
+    console.log('🔍 Debug: Midgard state changed from', currentMidgardState, 'to', isMidgardEnabled, '- clearing cache');
+    providersCache.clear();
+  }
+  currentMidgardState = isMidgardEnabled;
+  
+  // Check if we have cached providers for this chain
+  if (providersCache.has(chainName)) {
+    console.log('🔍 Debug: Using cached providers for', chainName, '(Midgard enabled:', isMidgardEnabled, ')');
+    return providersCache.get(chainName)!;
+  }
+  
+  // Get Midgard configuration if enabled
+  const midgardConfig = isMidgardEnabled && config().MIDGARD_URLS[chainName] 
+    ? {
+        baseUrl: config().MIDGARD_URLS[chainName],
+        rateLimiter
+      }
+    : undefined;
+
+  console.log('🔍 Debug: Midgard config:', midgardConfig);
+
+  const providers = await Wallet.createProviders({
     axiosAdapter: axiosFetchAdapter,
     env: {
       baseCardanoServicesUrl,
@@ -61,15 +99,72 @@ export const getProviders = async (chainName: Wallet.ChainName): Promise<Wallet.
         ...BLOCKFROST_CONFIGS[chainName],
         rateLimiter,
         apiVersion: 'v0'
-      }
-    },
+      },
+      midgardConfig,
+      isMidgardEnabled
+    } as any, // Type assertion to bypass type checking issue
     logger,
     experiments: {
       useWebSocket: isExperimentEnabled(ExperimentName.WEBSOCKET_API)
     },
     extensionLocalStorage: storage.local
   });
+  
+  // Cache the providers
+  providersCache.set(chainName, providers);
+  console.log('🔍 Debug: Created and cached new providers for', chainName, '(Midgard enabled:', isMidgardEnabled, ')');
+  
+  return providers;
 };
+
+/**
+ * Check if Midgard is enabled by reading from storage
+ */
+const checkMidgardEnabled = async (): Promise<boolean> => {
+  try {
+    // First try extension storage
+    const stored = await storage.local.get('midgardEnabled');
+    console.log('🔍 Debug: Extension storage check:', stored);
+    console.log('🔍 Debug: stored type:', typeof stored);
+    console.log('🔍 Debug: stored keys:', stored ? Object.keys(stored) : 'null/undefined');
+    
+    // Check if stored is an object with midgardEnabled property
+    if (stored && typeof stored === 'object' && 'midgardEnabled' in stored) {
+      console.log('🔍 Debug: Found in extension storage:', stored.midgardEnabled);
+      return stored.midgardEnabled === true;
+    }
+    
+    // Fallback to localStorage (for backward compatibility)
+    if (typeof window !== 'undefined') {
+      const localStored = localStorage.getItem('midgardEnabled');
+      console.log('🔍 Debug: localStorage check:', localStored);
+      return localStored ? JSON.parse(localStored) : false;
+    }
+    
+    console.log('🔍 Debug: No storage found, defaulting to false');
+    return false;
+  } catch (error) {
+    console.log('🔍 Debug: Error reading storage:', error);
+    return false;
+  }
+};
+
+// Function to clear provider cache when Midgard state changes
+export const clearProviderCache = () => {
+  console.log('🔍 Debug: Clearing provider cache');
+  providersCache.clear();
+  currentMidgardState = null;
+};
+
+// Debug function to manually check storage (can be called from console)
+if (typeof window !== 'undefined') {
+  (window as any).debugMidgardStorage = async () => {
+    console.log('🔍 Debug: Manual storage check...');
+    const result = await checkMidgardEnabled();
+    console.log('🔍 Debug: Manual check result:', result);
+    return result;
+  };
+}
 
 export const cip30WalletProperties = {
   // eslint-disable-next-line max-len
