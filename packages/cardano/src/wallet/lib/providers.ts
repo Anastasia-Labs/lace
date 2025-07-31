@@ -140,7 +140,14 @@ const cacheAssignment: Record<CacheName, { count: number; size: number }> = {
 
 export const createProviders = ({
   axiosAdapter,
-  env: { baseCardanoServicesUrl: baseUrl, baseKoraLabsServicesUrl, customSubmitTxUrl, blockfrostConfig, midgardConfig, isMidgardEnabled },
+  env: {
+    baseCardanoServicesUrl: baseUrl,
+    baseKoraLabsServicesUrl,
+    customSubmitTxUrl,
+    blockfrostConfig,
+    midgardConfig,
+    isMidgardEnabled
+  },
   logger,
   experiments: { useWebSocket },
   extensionLocalStorage
@@ -152,9 +159,7 @@ export const createProviders = ({
   });
 
   // Create Midgard client if enabled and configured
-  const midgardClient = isMidgardEnabled && midgardConfig 
-    ? new MidgardClient(midgardConfig, logger)
-    : null;
+  const midgardClient = isMidgardEnabled && midgardConfig ? new MidgardClient(midgardConfig, logger) : undefined;
 
   // Choose which client to use based on Midgard availability
   const isUsingMidgard = !!midgardClient;
@@ -207,15 +212,15 @@ export const createProviders = ({
         logger
       })
     : new BlockfrostInputResolver({
-    cache: createPersistentCacheStorage({
-      extensionLocalStorage,
-      fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.inputResolver].count,
-      resourceName: CacheName.inputResolver,
-      quotaInBytes: cacheAssignment[CacheName.inputResolver].size
-    }),
-    client: blockfrostClient,
-    logger
-  });
+        cache: createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.inputResolver].count,
+          resourceName: CacheName.inputResolver,
+          quotaInBytes: cacheAssignment[CacheName.inputResolver].size
+        }),
+        client: blockfrostClient,
+        logger
+      });
 
   const handleProvider = initHandleService({
     adapter: axiosAdapter,
@@ -260,7 +265,8 @@ export const createProviders = ({
   // Only use Midgard for UTxO provider if enabled, otherwise use Blockfrost
   const utxoProvider = isUsingMidgard
     ? new MidgardUtxoProvider(
-        midgardClient!,
+        midgardClient,
+        blockfrostClient,
         logger,
         createPersistentCacheStorage({
           extensionLocalStorage,
@@ -270,15 +276,15 @@ export const createProviders = ({
         })
       )
     : new BlockfrostUtxoProvider({
-    cache: createPersistentCacheStorage({
-      extensionLocalStorage,
-      fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
-      resourceName: CacheName.utxoProvider,
-      quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
-    }),
-    client: blockfrostClient,
-    logger
-  });
+        cache: createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
+          resourceName: CacheName.utxoProvider,
+          quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
+        }),
+        client: blockfrostClient,
+        logger
+      });
 
   return {
     assetProvider,
