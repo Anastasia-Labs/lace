@@ -7,10 +7,8 @@ export interface MidgardClientConfig {
 }
 
 export class MidgardError extends Error {
-  constructor(
-    public status: number,
-    message: string
-  ) {
+  // prettier-ignore
+  constructor(public status: number, message: string) {
     super(message);
     this.name = 'MidgardError';
   }
