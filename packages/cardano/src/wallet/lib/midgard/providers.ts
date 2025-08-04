@@ -16,3 +16,6 @@ export { MidgardInputResolver } from './input-resolver';
 
 // Export the epoch provider
 export { MidgardEpochProvider } from './epoch-provider';
+
+// Export the network provider
+export { MidgardNetworkProvider } from './network-provider';
