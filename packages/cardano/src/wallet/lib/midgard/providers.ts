@@ -13,3 +13,6 @@ export { MidgardUtxoProvider } from './utxo-provider';
 
 // Export the input resolver
 export { MidgardInputResolver } from './input-resolver';
+
+// Export the epoch provider
+export { MidgardEpochProvider } from './epoch-provider';
