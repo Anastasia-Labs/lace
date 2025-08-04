@@ -39,9 +39,7 @@ import { BlockfrostAddressDiscovery } from '@wallet/lib/blockfrost-address-disco
 import { WalletProvidersDependencies } from './cardano-wallet';
 import { BlockfrostInputResolver } from './blockfrost-input-resolver';
 import { initHandleService } from './handleService';
-import { MidgardClient } from './midgard-client';
-import { MidgardUtxoProvider } from './midgard-providers';
-import { MidgardInputResolver } from './midgard-input-resolver';
+import { MidgardClient, MidgardUtxoProvider, MidgardInputResolver } from './midgard/providers';
 
 const createTxSubmitProvider = (
   blockfrostClient: BlockfrostClient,

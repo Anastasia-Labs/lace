@@ -13,17 +13,13 @@ const txInToId = (txIn: Cardano.TxIn): string => `${txIn.txId}#${txIn.index}`;
 
 /**
  * A resolver class to fetch and resolve transaction inputs using Midgard API.
+ * This class implements the Cardano.InputResolver interface and provides
+ * functionality to resolve transaction inputs to their corresponding outputs.
  */
 export class MidgardInputResolver implements Cardano.InputResolver {
   readonly #logger: Logger;
   readonly #txCache: Cache<Cardano.TxOut>;
 
-  /**
-   * Constructs a new MidgardInputResolver.
-   *
-   * @param cache - A caching interface.
-   * @param logger - The logger instance to log messages to.
-   */
   constructor({ cache, logger }: { cache: Cache<Cardano.TxOut>; logger: Logger }) {
     this.#txCache = cache;
     this.#logger = logger;
@@ -61,55 +57,35 @@ export class MidgardInputResolver implements Cardano.InputResolver {
    * @private
    */
   private resolveFromHints(input: Cardano.TxIn, options?: Cardano.ResolveOptions): Cardano.TxOut | null {
-    if (options?.hints.transactions) {
-      for (const hint of options.hints.transactions) {
-        if (input.txId === hint.id && hint.body.outputs.length > input.index) {
-          this.#logger.debug(`Resolved input ${input.txId}#${input.index} from hint`);
-          void this.#txCache.set(txInToId(input), hint.body.outputs[input.index]);
+    if (!options?.hints?.transactions) return null;
 
-          return hint.body.outputs[input.index];
-        }
-      }
-    }
+    const tx = options.hints.transactions.find((t) => t.id === input.txId);
+    if (!tx) return null;
 
-    if (options?.hints.utxos) {
-      for (const utxo of options.hints.utxos) {
-        if (input.txId === utxo[0].txId && input.index === utxo[0].index) {
-          this.#logger.debug(`Resolved input ${input.txId}#${input.index} from hint`);
-          void this.#txCache.set(txInToId(input), utxo[1]);
+    const output = tx.body.outputs[input.index];
+    if (!output) return null;
 
-          return utxo[1];
-        }
-      }
-    }
-
-    return null;
+    return output;
   }
 
   /**
-   * Fetches and caches the transaction output (`Cardano.TxOut`) for a given transaction input (`Cardano.TxIn`).
-   *
+   * Fetches the transaction output from the Midgard API and caches it.
+   * @param input - The transaction input to resolve.
    * @private
-   * @param txIn - The transaction input to fetch and cache the output for.
-   * @returns A promise that resolves to the corresponding `Cardano.TxOut` if found, or `null` if not.
    */
-  private async fetchAndCacheTxOut(txIn: Cardano.TxIn): Promise<Cardano.TxOut | null> {
+  private async fetchAndCacheTxOut(input: Cardano.TxIn): Promise<Cardano.TxOut | null> {
     try {
-      // For now, we'll use a mock response since we don't have a real Midgard API
-      // In a real implementation, this would call the Midgard API to get transaction details
-      this.#logger.debug(`Fetching transaction ${txIn.txId} from Midgard`);
-      
-      // Since we don't have a real Midgard API endpoint for transaction details,
-      // we'll return null for now. In a real implementation, this would be:
-      // const response = await this.#client.request<any>(`txs/${txIn.txId}/utxos`);
-      
-      // For now, return null to indicate that the input couldn't be resolved
-      // This prevents the destructuring error by ensuring we don't return undefined values
-      this.#logger.warn(`Input ${txIn.txId}#${txIn.index} could not be resolved from Midgard - returning null`);
+      // For now, we'll use a placeholder implementation
+      // In a real implementation, you would make a request to Midgard API
+      // to fetch the transaction output for the given input
+      this.#logger.debug(`Fetching transaction output for ${input.txId}#${input.index} from Midgard`);
+
+      // Placeholder: return null for now
+      // TODO: Implement actual Midgard API call to fetch transaction output
       return null;
-    } catch (error: unknown) {
-      this.#logger.error(`Failed to fetch transaction ${txIn.txId} from Midgard`, error);
+    } catch (error) {
+      this.#logger.error(`Failed to fetch transaction output for ${input.txId}#${input.index}:`, error);
       return null;
     }
   }
-} 
+}
