@@ -39,12 +39,13 @@ import { BlockfrostAddressDiscovery } from '@wallet/lib/blockfrost-address-disco
 import { WalletProvidersDependencies } from './cardano-wallet';
 import { BlockfrostInputResolver } from './blockfrost-input-resolver';
 import { initHandleService } from './handleService';
-import { MidgardClient, MidgardUtxoProvider, MidgardInputResolver } from './midgard/providers';
+import { MidgardClient, MidgardUtxoProvider, MidgardInputResolver, MidgardTxSubmitProvider } from './midgard/providers';
 
 const createTxSubmitProvider = (
   blockfrostClient: BlockfrostClient,
   httpProviderConfig: CreateHttpProviderConfig<Provider>,
-  customSubmitTxUrl?: string
+  customSubmitTxUrl?: string,
+  midgardClient?: MidgardClient
 ): TxSubmitProvider => {
   if (customSubmitTxUrl) {
     httpProviderConfig.logger.debug(`Using custom TxSubmit api URL ${customSubmitTxUrl}`);
@@ -57,6 +58,13 @@ const createTxSubmitProvider = (
     );
   }
 
+  // If Midgard is enabled, use Midgard provider
+  if (midgardClient) {
+    httpProviderConfig.logger.debug('Using Midgard TxSubmit provider');
+    return new MidgardTxSubmitProvider(midgardClient, httpProviderConfig.logger);
+  }
+
+  // Default to Blockfrost provider
   return new BlockfrostTxSubmitProvider(blockfrostClient, httpProviderConfig.logger);
 };
 
@@ -185,7 +193,12 @@ export const createProviders = ({
 
   const stakePoolProvider = stakePoolHttpProvider(httpProviderConfig);
 
-  const txSubmitProvider = createTxSubmitProvider(blockfrostClient, httpProviderConfig, customSubmitTxUrl);
+  const txSubmitProvider = createTxSubmitProvider(
+    blockfrostClient,
+    httpProviderConfig,
+    customSubmitTxUrl,
+    midgardClient
+  );
 
   const dRepProvider = new BlockfrostDRepProvider(blockfrostClient, logger);
 

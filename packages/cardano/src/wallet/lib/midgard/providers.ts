@@ -19,3 +19,6 @@ export { MidgardEpochProvider } from './epoch-provider';
 
 // Export the network provider
 export { MidgardNetworkProvider } from './network-provider';
+
+// Export the transaction submit provider
+export { MidgardTxSubmitProvider } from './tx-submit-provider';
