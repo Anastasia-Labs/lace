@@ -22,3 +22,6 @@ export { MidgardNetworkProvider } from './network-provider';
 
 // Export the transaction submit provider
 export { MidgardTxSubmitProvider } from './tx-submit-provider';
+
+// Export the chain history provider
+export { MidgardChainHistoryProvider } from './history-provider';

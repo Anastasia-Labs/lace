@@ -39,7 +39,7 @@ import { BlockfrostAddressDiscovery } from '@wallet/lib/blockfrost-address-disco
 import { WalletProvidersDependencies } from './cardano-wallet';
 import { BlockfrostInputResolver } from './blockfrost-input-resolver';
 import { initHandleService } from './handleService';
-import { MidgardClient, MidgardUtxoProvider, MidgardInputResolver, MidgardTxSubmitProvider } from './midgard/providers';
+import { MidgardClient, MidgardUtxoProvider, MidgardInputResolver, MidgardTxSubmitProvider, MidgardChainHistoryProvider } from './midgard/providers';
 
 const createTxSubmitProvider = (
   blockfrostClient: BlockfrostClient,
@@ -177,17 +177,33 @@ export const createProviders = ({
 
   const networkInfoProvider = new BlockfrostNetworkInfoProvider(blockfrostClient, logger);
 
-  const chainHistoryProvider = new BlockfrostChainHistoryProvider({
-    client: blockfrostClient,
-    cache: createPersistentCacheStorage({
-      extensionLocalStorage,
-      fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.chainHistoryProvider].count,
-      resourceName: CacheName.chainHistoryProvider,
-      quotaInBytes: cacheAssignment[CacheName.chainHistoryProvider].size
-    }),
-    networkInfoProvider,
-    logger
-  });
+  // Use Midgard chain history provider if enabled, otherwise use Blockfrost
+  const chainHistoryProvider = isUsingMidgard
+    ? new MidgardChainHistoryProvider(
+        new MidgardUtxoProvider(
+          midgardClient,
+          blockfrostClient,
+          logger,
+          createPersistentCacheStorage({
+            extensionLocalStorage,
+            fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
+            resourceName: CacheName.utxoProvider,
+            quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
+          })
+        ),
+        logger
+      )
+    : new BlockfrostChainHistoryProvider({
+        client: blockfrostClient,
+        cache: createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.chainHistoryProvider].count,
+          resourceName: CacheName.chainHistoryProvider,
+          quotaInBytes: cacheAssignment[CacheName.chainHistoryProvider].size
+        }),
+        networkInfoProvider,
+        logger
+      });
 
   const rewardsProvider = new BlockfrostRewardsProvider(blockfrostClient, logger);
 

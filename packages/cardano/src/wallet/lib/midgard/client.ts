@@ -19,12 +19,12 @@ export class MidgardError extends Error {
  * This class implements a similar interface to BlockfrostClient for compatibility
  */
 export class MidgardClient {
-  readonly #config: MidgardClientConfig;
-  readonly #logger: Logger;
+  private readonly config: MidgardClientConfig;
+  private readonly logger: Logger;
 
   constructor(config: MidgardClientConfig, logger: Logger) {
-    this.#config = config;
-    this.#logger = logger;
+    this.config = config;
+    this.logger = logger;
   }
 
   /**
@@ -33,13 +33,13 @@ export class MidgardClient {
    * @returns Promise with the response data
    */
   async request<T>(endpoint: string): Promise<T> {
-    const url = `${this.#config.baseUrl}/${endpoint}`;
+    const url = `${this.config.baseUrl}/${endpoint}`;
 
-    this.#logger.debug(`Making Midgard request to: ${url}`);
+    this.logger.debug(`Making Midgard request to: ${url}`);
 
     try {
       // Use the rate limiter to respect rate limits
-      const response = await this.#config.rateLimiter.schedule(async () => {
+      const response = await this.config.rateLimiter.schedule(async () => {
         const res = await fetch(url, {
           method: 'GET',
           headers: {
@@ -56,7 +56,7 @@ export class MidgardClient {
 
       return response as T;
     } catch (error) {
-      this.#logger.error(`Midgard request failed for endpoint ${endpoint}:`, error);
+      this.logger.error(`Midgard request failed for endpoint ${endpoint}:`, error);
       throw error;
     }
   }
@@ -68,12 +68,12 @@ export class MidgardClient {
    * @returns Promise with the response data
    */
   async post<T>(endpoint: string, data: Record<string, unknown>): Promise<T> {
-    const url = `${this.#config.baseUrl}/${endpoint}`;
+    const url = `${this.config.baseUrl}/${endpoint}`;
 
-    this.#logger.debug(`Making Midgard POST request to: ${url}`);
+    this.logger.debug(`Making Midgard POST request to: ${url}`);
 
     try {
-      const response = await this.#config.rateLimiter.schedule(async () => {
+      const response = await this.config.rateLimiter.schedule(async () => {
         const res = await fetch(url, {
           method: 'POST',
           headers: {
@@ -91,7 +91,7 @@ export class MidgardClient {
 
       return response as T;
     } catch (error) {
-      this.#logger.error(`Midgard POST request failed for endpoint ${endpoint}:`, error);
+      this.logger.error(`Midgard POST request failed for endpoint ${endpoint}:`, error);
       throw error;
     }
   }

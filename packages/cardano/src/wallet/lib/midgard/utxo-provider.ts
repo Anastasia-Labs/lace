@@ -9,8 +9,8 @@ import { MidgardClient } from './client';
  * When Midgard requests fail, it automatically falls back to Blockfrost
  */
 export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
-  readonly #midgardClient: MidgardClient;
-  readonly #logger: Logger;
+  private readonly midgardClient: MidgardClient;
+  protected readonly logger: Logger;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(midgardClient: MidgardClient, blockfrostClient: BlockfrostClient, logger: Logger, cache: Cache<any>) {
@@ -19,8 +19,8 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
       cache,
       logger
     });
-    this.#midgardClient = midgardClient;
-    this.#logger = logger;
+    this.midgardClient = midgardClient;
+    this.logger = logger;
   }
 
   /**
@@ -50,7 +50,7 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
 
       return [txIn, txOut] as Cardano.Utxo | undefined;
     } catch (error) {
-      this.#logger.error('[Midgard] Failed to transform UTxO:', midgardUtxo, error);
+      this.logger.error('[Midgard] Failed to transform UTxO:', midgardUtxo, error);
       return undefined as Cardano.Utxo | undefined;
     }
   }
@@ -63,7 +63,7 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
 
     for (const address of addresses) {
       try {
-        const response = await this.#midgardClient.request<{
+        const response = await this.midgardClient.request<{
           utxos: Array<{ outref: { type: string; data: number[] }; value: { type: string; data: number[] } }>;
         }>(`utxos?addr=${address}`);
 
@@ -77,14 +77,14 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
 
         allUtxos.push(...transformedUtxos);
       } catch (error) {
-        this.#logger.error(`[Midgard] Failed for address ${address}:`, error);
-        this.#logger.info(`[Midgard] Falling back to Blockfrost for address ${address}`);
+        this.logger.error(`[Midgard] Failed for address ${address}:`, error);
+        this.logger.info(`[Midgard] Falling back to Blockfrost for address ${address}`);
 
         try {
           const blockfrostUtxos = await super.utxoByAddresses({ addresses: [address] });
           allUtxos.push(...blockfrostUtxos);
         } catch (blockfrostError) {
-          this.#logger.error(`[Midgard] Blockfrost fallback also failed for address ${address}:`, blockfrostError);
+          this.logger.error(`[Midgard] Blockfrost fallback also failed for address ${address}:`, blockfrostError);
           throw error;
         }
       }
