@@ -171,10 +171,10 @@ export const config = (): Config => {
       Testnet4: `${process.env.MEMPOOL_URL_TESTNET4}`
     },
     MIDGARD_URLS: {
-      Mainnet: process.env.MIDGARD_URL_MAINNET || 'https://api.midgard.example.com',
-      Preprod: process.env.MIDGARD_URL_PREPROD || 'https://api.midgard.example.com',
-      Preview: process.env.MIDGARD_URL_PREVIEW || 'https://api.midgard.example.com',
-      Sanchonet: process.env.MIDGARD_URL_SANCHONET || 'https://api.midgard.example.com'
+      Mainnet: process.env.MIDGARD_URL_MAINNET,
+      Preprod: process.env.MIDGARD_URL_PREPROD,
+      Preview: process.env.MIDGARD_URL_PREVIEW,
+      Sanchonet: process.env.MIDGARD_URL_SANCHONET
     }
   };
 };
