@@ -13,6 +13,7 @@ import { BrowserViewSections } from '@lib/scripts/types';
 import { NetworkPill } from '@components/NetworkPill';
 import { useAnalyticsContext } from '@providers';
 import { PostHogAction } from '@providers/AnalyticsProvider/analyticsTracker';
+import { MidgardBanner } from '@components/MidgardBanner/MidgardBanner';
 
 export const MainHeader = (): React.ReactElement => {
   const { t } = useTranslation();
@@ -62,6 +63,9 @@ export const MainHeader = (): React.ReactElement => {
           />
           <DropdownMenu isPopup />
         </div>
+      </div>
+      <div className={styles.bannerContainer}>
+        <MidgardBanner />
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { logger as commonLogger } from '@lace/common';
 import { ExtensionStorage } from '@lib/scripts/types';
 import { Wallet } from '@lace/cardano';
 import { contextLogger } from '@cardano-sdk/util';
+import { clearProviderCache } from './config';
 
 const logger = contextLogger(commonLogger, 'Background:StorageListener');
 
@@ -35,6 +36,22 @@ const handleBackgroundStorageChange = (changes: ExtensionStorageChange<'BACKGROU
   }
 };
 
+const handleMidgardStorageChange = (changes: Storage.StorageChange) => {
+  logger.info('Midgard storage changed:', changes);
+  
+  // Force a provider refresh when Midgard setting changes
+  // We need to re-initialize the providers with the new Midgard setting
+  if (changes.newValue !== undefined) {
+    logger.info('Midgard setting changed to:', changes.newValue);
+    // Clear the provider cache to force recreation with new Midgard setting
+    clearProviderCache();
+    
+    // The UI will listen for storage changes directly and trigger a refresh
+    // No need to send messages to tabs
+    logger.info('🔍 Debug: Storage change detected, UI will handle refresh via storage listener');
+  }
+};
+
 const initializeStorageListener = () => {
   // set initial values from storage
   webStorage.local
@@ -53,6 +70,11 @@ const initializeStorageListener = () => {
   webStorage.onChanged.addListener((changes) => {
     if (hasStorageChangeForKey(changes, 'BACKGROUND_STORAGE')) {
       handleBackgroundStorageChange(changes.BACKGROUND_STORAGE);
+    }
+    
+    // Listen for Midgard setting changes
+    if ('midgardEnabled' in changes) {
+      handleMidgardStorageChange(changes.midgardEnabled);
     }
   });
 };

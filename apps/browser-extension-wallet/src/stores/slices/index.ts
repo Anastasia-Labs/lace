@@ -6,3 +6,4 @@ export * from './lock-slice';
 export * from './activity-detail-slice';
 export * from './ui-slice';
 export * from './blockchain-provider-slice';
+export * from './midgard-slice';

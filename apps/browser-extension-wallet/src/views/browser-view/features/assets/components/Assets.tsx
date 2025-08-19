@@ -14,7 +14,6 @@ import { APP_MODE_POPUP } from '@src/utils/constants';
 import { ContentLayout } from '@components/Layout';
 import { useAnalyticsContext } from '@providers';
 import { PostHogAction } from '@providers/AnalyticsProvider/analyticsTracker';
-import { isNFT, mayBeNFT } from '@src/utils/is-nft';
 import {
   SendFlowAnalyticsProperties,
   SendFlowTriggerPoints,
@@ -34,6 +33,7 @@ import { BREAKPOINT_SMALL } from '@src/styles/constants';
 import { MidnightEventBanner } from './MidnightEventBanner';
 import { useCurrentBlockchain } from '@src/multichain';
 import { getNetworkName } from '@src/utils/get-network-name';
+import { Wallet } from '@lace/cardano';
 
 const LIST_ITEM_HEIGHT = 80;
 const SEND_COIN_OUTPUT_ID = 'output1';
@@ -58,7 +58,8 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
     activityDetail,
     resetActivityState,
     blockchainProvider,
-    environmentName
+    environmentName,
+    setMidgardMode // Add this line
   } = useWalletStore();
   const popupView = appMode === APP_MODE_POPUP;
   const hiddenBalancePlaceholder = getHiddenBalancePlaceholder();
@@ -73,6 +74,17 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
   const pageSize = useItemsPageSize(LIST_ITEM_HEIGHT);
   const [listItemsAmount, setListItemsAmount] = useState(pageSize);
   const [selectedAssetId, setSelectedAssetId] = useState<string | undefined>();
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'midgardEnabled' && e.newValue !== null) {
+        setMidgardMode(JSON.parse(e.newValue)); // Use the hook directly
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [setMidgardMode]); // Add setMidgardMode to dependencies
 
   useEffect(() => {
     setListItemsAmount(pageSize);
@@ -103,7 +115,7 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
     for (const [assetId] of utxoTotal.assets) {
       const assetInfo = assetsInfo?.get(assetId);
       // If no assetInfo, assume it's not an NFT until the info is loaded
-      if (!assetInfo || !isNFT(assetInfo)) return true;
+      if (!assetInfo || !Wallet.util.isNFT(assetInfo)) return true;
     }
     // Return false if all assets are NFTs as we are not displaying them in this component
     return false;
@@ -116,7 +128,7 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
     (assetId, withVisibleBalances = true) => {
       const info = assetsInfo?.get(assetId);
       const fiat = priceResult?.cardano?.price;
-      return !mayBeNFT(info)
+      return !Wallet.util.mayBeNFT(info)
         ? assetTransformer({
             key: assetId,
             fiat,
@@ -308,6 +320,7 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
 
   return popupView ? (
     <>
+      {/* <MidgardBanner /> */}
       <ContentLayout hasCredit={fullAssetList?.length > 0}>
         <MidnightEventBanner />
         {assetsPortfolio}

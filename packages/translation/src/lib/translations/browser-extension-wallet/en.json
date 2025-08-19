@@ -748,6 +748,7 @@
   "general.networks.preprod": "Preprod",
   "general.networks.preview": "Preview",
   "general.networks.sanchonet": "Sanchonet",
+  "general.networks.midgard": "Midgard",
   "general.warnings.areYouSureYouWantToExit": "Are you sure you want to exit?",
   "general.warnings.cannotFetchPrice": "Unable to fetch fiat values. Everything's fine – just come back later.",
   "general.warnings.priceDataExpired": "Price data expired - We are unable to fetch the most recent pricing information.\nDetails of the last ADA value recorded: {{ date }}",

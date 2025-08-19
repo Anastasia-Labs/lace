@@ -39,11 +39,13 @@ import { BlockfrostAddressDiscovery } from '@wallet/lib/blockfrost-address-disco
 import { WalletProvidersDependencies } from './cardano-wallet';
 import { BlockfrostInputResolver } from './blockfrost-input-resolver';
 import { initHandleService } from './handleService';
+import { MidgardClient, MidgardUtxoProvider, MidgardInputResolver, MidgardTxSubmitProvider, MidgardChainHistoryProvider } from './midgard/providers';
 
 const createTxSubmitProvider = (
   blockfrostClient: BlockfrostClient,
   httpProviderConfig: CreateHttpProviderConfig<Provider>,
-  customSubmitTxUrl?: string
+  customSubmitTxUrl?: string,
+  midgardClient?: MidgardClient
 ): TxSubmitProvider => {
   if (customSubmitTxUrl) {
     httpProviderConfig.logger.debug(`Using custom TxSubmit api URL ${customSubmitTxUrl}`);
@@ -56,6 +58,13 @@ const createTxSubmitProvider = (
     );
   }
 
+  // If Midgard is enabled, use Midgard provider
+  if (midgardClient) {
+    httpProviderConfig.logger.debug('Using Midgard TxSubmit provider');
+    return new MidgardTxSubmitProvider(midgardClient, httpProviderConfig.logger);
+  }
+
+  // Default to Blockfrost provider
   return new BlockfrostTxSubmitProvider(blockfrostClient, httpProviderConfig.logger);
 };
 
@@ -84,6 +93,8 @@ interface ProvidersConfig {
     baseKoraLabsServicesUrl: string;
     customSubmitTxUrl?: string;
     blockfrostConfig: BlockfrostClientConfig & { rateLimiter: RateLimiter };
+    midgardConfig?: { baseUrl: string; rateLimiter: RateLimiter };
+    isMidgardEnabled?: boolean;
   };
   logger: Logger;
   experiments: {
@@ -135,7 +146,14 @@ const cacheAssignment: Record<CacheName, { count: number; size: number }> = {
 
 export const createProviders = ({
   axiosAdapter,
-  env: { baseCardanoServicesUrl: baseUrl, baseKoraLabsServicesUrl, customSubmitTxUrl, blockfrostConfig },
+  env: {
+    baseCardanoServicesUrl: baseUrl,
+    baseKoraLabsServicesUrl,
+    customSubmitTxUrl,
+    blockfrostConfig,
+    midgardConfig,
+    isMidgardEnabled
+  },
   logger,
   experiments: { useWebSocket },
   extensionLocalStorage
@@ -145,22 +163,59 @@ export const createProviders = ({
   const blockfrostClient = new BlockfrostClient(blockfrostConfig, {
     rateLimiter: blockfrostConfig.rateLimiter
   });
+
+  // Create Midgard client if enabled and configured
+  const midgardClient = isMidgardEnabled && midgardConfig ? new MidgardClient(midgardConfig, logger) : undefined;
+
+  // Choose which client to use based on Midgard availability
+  const isUsingMidgard = !!midgardClient;
+
+  logger.info(`Using ${isUsingMidgard ? 'Midgard' : 'Blockfrost'} providers`);
+
+  // Create providers using the appropriate client
   const assetProvider = new BlockfrostAssetProvider(blockfrostClient, logger);
+
   const networkInfoProvider = new BlockfrostNetworkInfoProvider(blockfrostClient, logger);
-  const chainHistoryProvider = new BlockfrostChainHistoryProvider({
-    client: blockfrostClient,
-    cache: createPersistentCacheStorage({
-      extensionLocalStorage,
-      fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.chainHistoryProvider].count,
-      resourceName: CacheName.chainHistoryProvider,
-      quotaInBytes: cacheAssignment[CacheName.chainHistoryProvider].size
-    }),
-    networkInfoProvider,
-    logger
-  });
+
+  // Use Midgard chain history provider if enabled, otherwise use Blockfrost
+  const chainHistoryProvider = isUsingMidgard
+    ? new MidgardChainHistoryProvider(
+        new MidgardUtxoProvider(
+          midgardClient,
+          blockfrostClient,
+          logger,
+          createPersistentCacheStorage({
+            extensionLocalStorage,
+            fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
+            resourceName: CacheName.utxoProvider,
+            quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
+          })
+        ),
+        logger
+      )
+    : new BlockfrostChainHistoryProvider({
+        client: blockfrostClient,
+        cache: createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.chainHistoryProvider].count,
+          resourceName: CacheName.chainHistoryProvider,
+          quotaInBytes: cacheAssignment[CacheName.chainHistoryProvider].size
+        }),
+        networkInfoProvider,
+        logger
+      });
+
   const rewardsProvider = new BlockfrostRewardsProvider(blockfrostClient, logger);
+
   const stakePoolProvider = stakePoolHttpProvider(httpProviderConfig);
-  const txSubmitProvider = createTxSubmitProvider(blockfrostClient, httpProviderConfig, customSubmitTxUrl);
+
+  const txSubmitProvider = createTxSubmitProvider(
+    blockfrostClient,
+    httpProviderConfig,
+    customSubmitTxUrl,
+    midgardClient
+  );
+
   const dRepProvider = new BlockfrostDRepProvider(blockfrostClient, logger);
 
   const addressDiscovery = new BlockfrostAddressDiscovery(blockfrostClient, logger);
@@ -172,16 +227,27 @@ export const createProviders = ({
     stakePoolProvider
   });
 
-  const inputResolver = new BlockfrostInputResolver({
-    cache: createPersistentCacheStorage({
-      extensionLocalStorage,
-      fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.inputResolver].count,
-      resourceName: CacheName.inputResolver,
-      quotaInBytes: cacheAssignment[CacheName.inputResolver].size
-    }),
-    client: blockfrostClient,
-    logger
-  });
+  // Use Midgard input resolver if Midgard is enabled, otherwise use Blockfrost
+  const inputResolver = isUsingMidgard
+    ? new MidgardInputResolver({
+        cache: createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.inputResolver].count,
+          resourceName: CacheName.inputResolver,
+          quotaInBytes: cacheAssignment[CacheName.inputResolver].size
+        }),
+        logger
+      })
+    : new BlockfrostInputResolver({
+        cache: createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.inputResolver].count,
+          resourceName: CacheName.inputResolver,
+          quotaInBytes: cacheAssignment[CacheName.inputResolver].size
+        }),
+        client: blockfrostClient,
+        logger
+      });
 
   const handleProvider = initHandleService({
     adapter: axiosAdapter,
@@ -223,16 +289,29 @@ export const createProviders = ({
     };
   }
 
-  const utxoProvider = new BlockfrostUtxoProvider({
-    cache: createPersistentCacheStorage({
-      extensionLocalStorage,
-      fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
-      resourceName: CacheName.utxoProvider,
-      quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
-    }),
-    client: blockfrostClient,
-    logger
-  });
+  // Only use Midgard for UTxO provider if enabled, otherwise use Blockfrost
+  const utxoProvider = isUsingMidgard
+    ? new MidgardUtxoProvider(
+        midgardClient,
+        blockfrostClient,
+        logger,
+        createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
+          resourceName: CacheName.utxoProvider,
+          quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
+        })
+      )
+    : new BlockfrostUtxoProvider({
+        cache: createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
+          resourceName: CacheName.utxoProvider,
+          quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
+        }),
+        client: blockfrostClient,
+        logger
+      });
 
   return {
     assetProvider,
