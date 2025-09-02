@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useWalletStore } from '@src/stores';
 import { toast } from '@lace/common';
 import { Switch } from 'antd';
-import SwithIcon from '@src/assets/icons/switch.component.svg';
+import SwitchIcon from '@src/assets/icons/switch.component.svg';
 import styles from './MidgardBanner.module.scss';
 
 export const MidgardBanner = (): React.ReactElement => {
@@ -16,7 +16,7 @@ export const MidgardBanner = (): React.ReactElement => {
     toast.notify({
       text: checked ? 'Midgard Layer 2 enabled' : 'Midgard Layer 2 disabled',
       withProgressBar: true,
-      icon: SwithIcon
+      icon: SwitchIcon
     });
   };
 
