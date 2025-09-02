@@ -84,12 +84,11 @@ async utxoByAddresses({ addresses }: { addresses: string[] }): Promise<Cardano.U
           return blockfrostUtxos;
         } catch (blockfrostError) {
           this.logger.error(`[Midgard] Blockfrost fallback also failed for address ${address}:`, blockfrostError);
-          throw error;
+          throw blockfrostError;
         }
       }
     })
   );
 
-  // Flatten array of arrays into one array
   return allUtxosArrays.flat();
 }};
