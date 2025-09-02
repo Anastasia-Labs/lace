@@ -56,12 +56,11 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
   }
 
   /**
-   * Fetch UTxOs from Midgard with automatic fallback to Blockfrost
+   * Fetch UTxOs from Midgard
    */
-  async utxoByAddresses({ addresses }: { addresses: string[] }): Promise<Cardano.Utxo[]> {
-    const allUtxos: Cardano.Utxo[] = [];
-
-    for (const address of addresses) {
+async utxoByAddresses({ addresses }: { addresses: string[] }): Promise<Cardano.Utxo[]> {
+  const allUtxosArrays = await Promise.all(
+    addresses.map(async (address) => {
       try {
         const response = await this.midgardClient.request<{
           utxos: Array<{ outref: { type: string; data: number[] }; value: { type: string; data: number[] } }>;
@@ -75,21 +74,22 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
           .map((utxo) => this.transformMidgardUtxo(utxo))
           .filter((utxo): utxo is Cardano.Utxo => utxo !== undefined);
 
-        allUtxos.push(...transformedUtxos);
+        return transformedUtxos;
       } catch (error) {
         this.logger.error(`[Midgard] Failed for address ${address}:`, error);
         this.logger.info(`[Midgard] Falling back to Blockfrost for address ${address}`);
 
         try {
           const blockfrostUtxos = await super.utxoByAddresses({ addresses: [address] });
-          allUtxos.push(...blockfrostUtxos);
+          return blockfrostUtxos;
         } catch (blockfrostError) {
           this.logger.error(`[Midgard] Blockfrost fallback also failed for address ${address}:`, blockfrostError);
           throw error;
         }
       }
-    }
+    })
+  );
 
-    return allUtxos;
-  }
-}
+  // Flatten array of arrays into one array
+  return allUtxosArrays.flat();
+}};
