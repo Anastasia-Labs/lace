@@ -176,20 +176,44 @@ export const createProviders = ({
   // Create Midgard client if enabled and configured
   const midgardClient = isMidgardEnabled && midgardConfig ? new MidgardClient(midgardConfig, logger) : undefined;
 
-  // Choose which client to use based on Midgard availability
   const isUsingMidgard = !!midgardClient;
 
   logger.info(`Using ${isUsingMidgard ? 'Midgard' : 'Blockfrost'} providers`);
+  if (isUsingMidgard) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    logger.debug(`Midgard base URL: ${(midgardConfig!).baseUrl}`);
+    if (wsProvider) {
+      logger.debug('Closing existing WebSocket provider due to Midgard mode');
+      wsProvider.close().catch((error) => logger.warn(error, 'While closing wsProvider'));
+      // eslint-disable-next-line unicorn/no-useless-undefined
+      // @ts-expect-error allow runtime reset
+      wsProvider = undefined;
+    }
+  }
 
-  // Create providers using the appropriate client
   const assetProvider = new BlockfrostAssetProvider(blockfrostClient, logger);
 
   const networkInfoProvider = new BlockfrostNetworkInfoProvider(blockfrostClient, logger);
 
+  // Only use Midgard for UTxO provider if enabled, otherwise use Blockfrost
+  const utxoProvider = isUsingMidgard
+    ? new MidgardUtxoProvider(
+        midgardClient,
+        blockfrostClient,
+        logger,
+        createCache(CacheName.utxoProvider)
+      )
+    : new BlockfrostUtxoProvider({
+        cache: createCache(CacheName.utxoProvider),
+        client: blockfrostClient,
+        logger
+      });
+
   // Use Midgard chain history provider if enabled, otherwise use Blockfrost
   const chainHistoryProvider = isUsingMidgard
     ? new MidgardChainHistoryProvider(
-        midgardClient,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        midgardClient!,
         logger
       )
     : new BlockfrostChainHistoryProvider({
@@ -239,7 +263,7 @@ export const createProviders = ({
     cache: createCache(CacheName.handleProvider)
   });
 
-  if (useWebSocket) {
+  if (useWebSocket && !isUsingMidgard) {
     const url = new URL(baseUrl);
 
     url.pathname = '/ws';
@@ -267,20 +291,6 @@ export const createProviders = ({
       drepProvider: dRepProvider
     };
   }
-
-  // Only use Midgard for UTxO provider if enabled, otherwise use Blockfrost
-  const utxoProvider = isUsingMidgard
-    ? new MidgardUtxoProvider(
-        midgardClient,
-        blockfrostClient,
-        logger,
-        createCache(CacheName.utxoProvider)
-      )
-    : new BlockfrostUtxoProvider({
-        cache: createCache(CacheName.utxoProvider),
-        client: blockfrostClient,
-        logger
-      });
 
   return {
     assetProvider,
