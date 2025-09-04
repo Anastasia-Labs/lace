@@ -35,6 +35,7 @@ import {
   BlockfrostRewardAccountInfoProvider
 } from '@cardano-sdk/cardano-services-client';
 import { RemoteApiProperties, RemoteApiPropertyType, createPersistentCacheStorage } from '@cardano-sdk/web-extension';
+import type { Cache } from '@cardano-sdk/util';
 import { BlockfrostAddressDiscovery } from '@wallet/lib/blockfrost-address-discovery';
 import { WalletProvidersDependencies } from './cardano-wallet';
 import { BlockfrostInputResolver } from './blockfrost-input-resolver';
@@ -158,6 +159,14 @@ export const createProviders = ({
   experiments: { useWebSocket },
   extensionLocalStorage
 }: ProvidersConfig): WalletProvidersDependencies => {
+
+  const createCache = <T>(cacheName: CacheName): Cache<T> => createPersistentCacheStorage({
+    extensionLocalStorage,
+    fallbackMaxCollectionItemsGuard: cacheAssignment[cacheName].count,
+    resourceName: cacheName,
+    quotaInBytes: cacheAssignment[cacheName].size
+  })
+
   const httpProviderConfig: CreateHttpProviderConfig<Provider> = { baseUrl, logger, adapter: axiosAdapter };
 
   const blockfrostClient = new BlockfrostClient(blockfrostConfig, {
@@ -195,12 +204,7 @@ export const createProviders = ({
       )
     : new BlockfrostChainHistoryProvider({
         client: blockfrostClient,
-        cache: createPersistentCacheStorage({
-          extensionLocalStorage,
-          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.chainHistoryProvider].count,
-          resourceName: CacheName.chainHistoryProvider,
-          quotaInBytes: cacheAssignment[CacheName.chainHistoryProvider].size
-        }),
+        cache: createCache(CacheName.chainHistoryProvider),
         networkInfoProvider,
         logger
       });
@@ -230,21 +234,11 @@ export const createProviders = ({
   // Use Midgard input resolver if Midgard is enabled, otherwise use Blockfrost
   const inputResolver = isUsingMidgard
     ? new MidgardInputResolver({
-        cache: createPersistentCacheStorage({
-          extensionLocalStorage,
-          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.inputResolver].count,
-          resourceName: CacheName.inputResolver,
-          quotaInBytes: cacheAssignment[CacheName.inputResolver].size
-        }),
+        cache: createCache(CacheName.inputResolver),
         logger
       })
     : new BlockfrostInputResolver({
-        cache: createPersistentCacheStorage({
-          extensionLocalStorage,
-          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.inputResolver].count,
-          resourceName: CacheName.inputResolver,
-          quotaInBytes: cacheAssignment[CacheName.inputResolver].size
-        }),
+        cache: createCache(CacheName.inputResolver),
         client: blockfrostClient,
         logger
       });
@@ -252,12 +246,7 @@ export const createProviders = ({
   const handleProvider = initHandleService({
     adapter: axiosAdapter,
     baseKoraLabsServicesUrl,
-    cache: createPersistentCacheStorage({
-      extensionLocalStorage,
-      fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.handleProvider].count,
-      resourceName: CacheName.handleProvider,
-      quotaInBytes: cacheAssignment[CacheName.handleProvider].size
-    })
+    cache: createCache(CacheName.handleProvider)
   });
 
   if (useWebSocket) {
@@ -295,20 +284,10 @@ export const createProviders = ({
         midgardClient,
         blockfrostClient,
         logger,
-        createPersistentCacheStorage({
-          extensionLocalStorage,
-          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
-          resourceName: CacheName.utxoProvider,
-          quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
-        })
+        createCache(CacheName.utxoProvider)
       )
     : new BlockfrostUtxoProvider({
-        cache: createPersistentCacheStorage({
-          extensionLocalStorage,
-          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
-          resourceName: CacheName.utxoProvider,
-          quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
-        }),
+        cache: createCache(CacheName.utxoProvider),
         client: blockfrostClient,
         logger
       });
