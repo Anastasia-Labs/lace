@@ -64,7 +64,7 @@ async utxoByAddresses({ addresses }: { addresses: string[] }): Promise<Cardano.U
       try {
         const response = await this.midgardClient.request<{
           utxos: Array<{ outref: { type: string; data: number[] }; value: { type: string; data: number[] } }>;
-        }>(`utxos?addr=${address}`);
+        }>(`utxos?address=${address}`);
 
         if (!response?.utxos?.length) {
           throw new Error('Invalid response format from Midgard');
