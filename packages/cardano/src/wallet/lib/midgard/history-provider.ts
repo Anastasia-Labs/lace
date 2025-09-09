@@ -30,8 +30,7 @@ export class MidgardChainHistoryProvider implements ChainHistoryProvider {
       const blockHeader = {
         blockNo: Cardano.BlockNo(0),
         slot: Cardano.Slot(0),
-        // 64-char random hex as placeholder; replaced when Midgard exposes real headers
-        hash: Cardano.BlockId(Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join(''))
+        hash: Cardano.BlockId('0000000000000000000000000000000000000000000000000000000000000000')
       } as { blockNo: Cardano.BlockNo; slot: Cardano.Slot; hash: Cardano.BlockId };
 
       const hydrated: Cardano.HydratedTx = {
@@ -58,12 +57,12 @@ export class MidgardChainHistoryProvider implements ChainHistoryProvider {
    */
   async transactionsByAddresses(args: TransactionsByAddressesArgs): Promise<Paginated<Cardano.HydratedTx>> {
     const { addresses } = args;
+    this.logger.info(`[MidgardChainHistoryProvider] Fetching txs for address ${addresses}`);
     if (!addresses || addresses.length === 0) {
       return { pageResults: [], totalResultCount: 0 };
     }
 
     const address = addresses[0];
-    this.logger.info(`[MidgardChainHistoryProvider] Fetching txs for address ${address}`);
 
     try {
       const response = await this.client.request<{
@@ -83,6 +82,8 @@ export class MidgardChainHistoryProvider implements ChainHistoryProvider {
       const hydrated = cborsList
         .map((bytes) => this.transformTxCborToHydratedTx(bytes))
         .filter((tx): tx is Cardano.HydratedTx => !!tx);
+
+      this.logger.info(`[MidgardChainHistoryProvider] Found ${hydrated.length} transactions for address ${address}`);
 
       // Midgard currently does not paginate; we return all we got
       return {
