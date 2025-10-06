@@ -212,7 +212,7 @@ export const createProviders = ({
     extensionLocalStorage,
     networkInfoProvider
   });
-  const txSubmitProvider = createTxSubmitProvider(blockfrostClient, httpProviderConfig, customSubmitTxUrl);
+  const txSubmitProvider = createTxSubmitProvider(blockfrostClient, httpProviderConfig, customSubmitTxUrl, midgardClient);
   const dRepProvider = new BlockfrostDRepProvider(blockfrostClient, logger);
 
   const addressDiscovery = new BlockfrostAddressDiscovery(blockfrostClient, logger);
