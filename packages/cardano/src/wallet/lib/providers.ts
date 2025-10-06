@@ -149,7 +149,8 @@ const cacheAssignment: Record<CacheName, { count: number; size: number }> = {
 
 export const createProviders = ({
   axiosAdapter,
-  env: { baseCardanoServicesUrl: baseUrl, baseKoraLabsServicesUrl, customSubmitTxUrl, blockfrostConfig },
+  chainName,
+  env: { baseCardanoServicesUrl: baseUrl, baseKoraLabsServicesUrl, customSubmitTxUrl, blockfrostConfig, midgardConfig, isMidgardEnabled },
   logger,
   experiments: { useWebSocket },
   extensionLocalStorage
@@ -205,7 +206,12 @@ export const createProviders = ({
       });
 
   const rewardsProvider = new BlockfrostRewardsProvider(blockfrostClient, logger);
-  const stakePoolProvider = stakePoolHttpProvider(httpProviderConfig);
+  const stakePoolProvider = initStakePoolService({
+    blockfrostClient,
+    chainName,
+    extensionLocalStorage,
+    networkInfoProvider
+  });
   const txSubmitProvider = createTxSubmitProvider(blockfrostClient, httpProviderConfig, customSubmitTxUrl);
   const dRepProvider = new BlockfrostDRepProvider(blockfrostClient, logger);
 
