@@ -27,12 +27,12 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
    * Transform Midgard UTxO data to Cardano SDK format using CBOR decoding
    */
   private transformMidgardUtxo(midgardUtxo: {
-    outref: { type: string; data: number[] };
-    value: { type: string; data: number[] };
+    outref: string;
+    value: string;
   }): Cardano.Utxo | undefined {
     try {
-      const outrefBuffer = Buffer.from(midgardUtxo.outref.data);
-      const valueBuffer = Buffer.from(midgardUtxo.value.data);
+      const outrefBuffer = Buffer.from(midgardUtxo.outref, 'hex')
+      const valueBuffer = Buffer.from(midgardUtxo.value, 'hex')
 
       const txInput = Serialization.TransactionInput.fromCbor(outrefBuffer);
       const txOutput = Serialization.TransactionOutput.fromCbor(valueBuffer);
@@ -61,32 +61,15 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
 async utxoByAddresses({ addresses }: { addresses: string[] }): Promise<Cardano.Utxo[]> {
   const allUtxosArrays = await Promise.all(
     addresses.map(async (address) => {
-      try {
-        const response = await this.midgardClient.request<{
-          utxos: Array<{ outref: { type: string; data: number[] }; value: { type: string; data: number[] } }>;
-        }>(`utxos?addr=${address}`);
+      const response = await this.midgardClient.request<{
+        utxos: Array<{ outref: string; value: string }>;
+      }>(`utxos?address=${address}`);
 
-        if (!response?.utxos?.length) {
-          throw new Error('Invalid response format from Midgard');
-        }
+      const transformedUtxos = (response?.utxos ?? [])
+        .map((utxo) => this.transformMidgardUtxo(utxo))
+        .filter((utxo): utxo is Cardano.Utxo => utxo !== undefined);
 
-        const transformedUtxos = response.utxos
-          .map((utxo) => this.transformMidgardUtxo(utxo))
-          .filter((utxo): utxo is Cardano.Utxo => utxo !== undefined);
-
-        return transformedUtxos;
-      } catch (error) {
-        this.logger.error(`[Midgard] Failed for address ${address}:`, error);
-        this.logger.info(`[Midgard] Falling back to Blockfrost for address ${address}`);
-
-        try {
-          const blockfrostUtxos = await super.utxoByAddresses({ addresses: [address] });
-          return blockfrostUtxos;
-        } catch (blockfrostError) {
-          this.logger.error(`[Midgard] Blockfrost fallback also failed for address ${address}:`, blockfrostError);
-          throw blockfrostError;
-        }
-      }
+      return transformedUtxos;
     })
   );
 
