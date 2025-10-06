@@ -26,18 +26,12 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
    * Transform Midgard UTxO data to Cardano SDK format using CBOR decoding
    */
   private transformMidgardUtxo(midgardUtxo: {
-    outref: { type: string; data: number[] } | string;
-    value: { type: string; data: number[] } | string;
+    outref: string;
+    value: string;
   }): Cardano.Utxo | undefined {
     try {
-      const outrefBuffer =
-        typeof midgardUtxo.outref === 'string'
-          ? Buffer.from(midgardUtxo.outref, 'hex')
-          : Buffer.from(midgardUtxo.outref.data);
-      const valueBuffer =
-        typeof midgardUtxo.value === 'string'
-          ? Buffer.from(midgardUtxo.value, 'hex')
-          : Buffer.from(midgardUtxo.value.data);
+      const outrefBuffer = Buffer.from(midgardUtxo.outref, 'hex')
+      const valueBuffer = Buffer.from(midgardUtxo.value, 'hex')
 
       const txInput = Serialization.TransactionInput.fromCbor(outrefBuffer);
       const txOutput = Serialization.TransactionOutput.fromCbor(valueBuffer);
@@ -67,7 +61,7 @@ async utxoByAddresses({ addresses }: { addresses: string[] }): Promise<Cardano.U
   const allUtxosArrays = await Promise.all(
     addresses.map(async (address) => {
       const response = await this.midgardClient.request<{
-        utxos: Array<{ outref: { type: string; data: number[] } | string; value: { type: string; data: number[] } | string }>;
+        utxos: Array<{ outref: string; value: string }>;
       }>(`utxos?address=${address}`);
 
       const transformedUtxos = (response?.utxos ?? [])
