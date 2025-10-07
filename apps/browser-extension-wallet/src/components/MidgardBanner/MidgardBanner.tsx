@@ -10,11 +10,12 @@ export const MidgardBanner = (): React.ReactElement => {
   const { t } = useTranslation();
   const { environmentName, isMidgardEnabled, setMidgardMode } = useWalletStore();
 
-  const handleToggle = (checked: boolean) => {
-    setMidgardMode(checked);
+  const handleToggle = () => {
+    const newState = !isMidgardEnabled;
+    setMidgardMode(newState);
 
     toast.notify({
-      text: checked ? 'Midgard Layer 2 enabled' : 'Midgard Layer 2 disabled',
+      text: newState ? 'Midgard Layer 2 enabled' : 'Midgard Layer 2 disabled',
       withProgressBar: true,
       icon: SwitchIcon
     });
@@ -22,11 +23,14 @@ export const MidgardBanner = (): React.ReactElement => {
 
   // Use conditional rendering instead of early return
   return environmentName === 'Preprod' ? (
-    <div className={`${styles.banner} ${isMidgardEnabled ? styles.enabled : styles.disabled}`}>
+    <div 
+      className={`${styles.banner} ${isMidgardEnabled ? styles.enabled : styles.disabled}`}
+      onClick={handleToggle}
+    >
       <span className={styles.text}>
         {isMidgardEnabled ? `${t('general.networks.midgard')} mode` : `${t('general.networks.midgard')} mode`}
       </span>
-      <Switch checked={isMidgardEnabled} onChange={handleToggle} size="default" />
+      <Switch checked={isMidgardEnabled} size="default" />
     </div>
   ) : (
     <></>
