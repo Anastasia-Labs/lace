@@ -10,6 +10,8 @@
   transition: all 0.3s ease;
   min-width: 200px; /* Ensure minimum width */
   flex-shrink: 0; /* Prevent shrinking */
+  cursor: pointer; /* Show it's clickable */
+  user-select: none; /* Prevent text selection when clicking */
 }
 
 .enabled {

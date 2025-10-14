@@ -20,7 +20,6 @@ import {
 import {
   CardanoWsClient,
   CreateHttpProviderConfig,
-  stakePoolHttpProvider,
   TxSubmitApiProvider,
   BlockfrostClientConfig,
   RateLimiter,
@@ -40,6 +39,8 @@ import { BlockfrostAddressDiscovery } from '@wallet/lib/blockfrost-address-disco
 import { WalletProvidersDependencies } from './cardano-wallet';
 import { BlockfrostInputResolver } from './blockfrost-input-resolver';
 import { initHandleService } from './handleService';
+import { initStakePoolService } from './stakePoolService';
+import { ChainName } from '../types';
 import { MidgardClient, MidgardUtxoProvider, MidgardInputResolver, MidgardTxSubmitProvider, MidgardChainHistoryProvider } from './midgard/providers';
 
 const createTxSubmitProvider = (
@@ -89,6 +90,7 @@ export type RateLimiterConfig = {
 
 interface ProvidersConfig {
   axiosAdapter?: AxiosAdapter;
+  chainName: ChainName;
   env: {
     baseCardanoServicesUrl: string;
     baseKoraLabsServicesUrl: string;
@@ -147,14 +149,8 @@ const cacheAssignment: Record<CacheName, { count: number; size: number }> = {
 
 export const createProviders = ({
   axiosAdapter,
-  env: {
-    baseCardanoServicesUrl: baseUrl,
-    baseKoraLabsServicesUrl,
-    customSubmitTxUrl,
-    blockfrostConfig,
-    midgardConfig,
-    isMidgardEnabled
-  },
+  chainName,
+  env: { baseCardanoServicesUrl: baseUrl, baseKoraLabsServicesUrl, customSubmitTxUrl, blockfrostConfig, midgardConfig, isMidgardEnabled },
   logger,
   experiments: { useWebSocket },
   extensionLocalStorage
@@ -224,16 +220,13 @@ export const createProviders = ({
       });
 
   const rewardsProvider = new BlockfrostRewardsProvider(blockfrostClient, logger);
-
-  const stakePoolProvider = stakePoolHttpProvider(httpProviderConfig);
-
-  const txSubmitProvider = createTxSubmitProvider(
+  const stakePoolProvider = initStakePoolService({
     blockfrostClient,
-    httpProviderConfig,
-    customSubmitTxUrl,
-    midgardClient
-  );
-
+    chainName,
+    extensionLocalStorage,
+    networkInfoProvider
+  });
+  const txSubmitProvider = createTxSubmitProvider(blockfrostClient, httpProviderConfig, customSubmitTxUrl, midgardClient);
   const dRepProvider = new BlockfrostDRepProvider(blockfrostClient, logger);
 
   const addressDiscovery = new BlockfrostAddressDiscovery(blockfrostClient, logger);

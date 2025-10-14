@@ -91,6 +91,7 @@ export const getProviders = async (chainName: Wallet.ChainName): Promise<Wallet.
 
   const providers = await Wallet.createProviders({
     axiosAdapter: axiosFetchAdapter,
+    chainName,
     env: {
       baseCardanoServicesUrl,
       baseKoraLabsServicesUrl,
