@@ -21,16 +21,29 @@ export const MidgardBanner = (): React.ReactElement => {
     });
   };
 
+  const handleButtonClick = () => {
+    toast.notify({
+      text: isMidgardEnabled ? 'Withdrawing to Cardano...' : 'Depositing to Midgard...',
+      withProgressBar: true,
+      icon: SwitchIcon
+    });
+  };
+
   // Use conditional rendering instead of early return
   return environmentName === 'Preprod' ? (
-    <div 
-      className={`${styles.banner} ${isMidgardEnabled ? styles.enabled : styles.disabled}`}
-      onClick={handleToggle}
-    >
-      <span className={styles.text}>
-        {isMidgardEnabled ? `${t('general.networks.midgard')} mode` : `${t('general.networks.midgard')} mode`}
-      </span>
-      <Switch checked={isMidgardEnabled} size="default" />
+    <div className={styles.container}>
+      <button className={styles.actionButton} onClick={handleButtonClick}>
+        {isMidgardEnabled ? 'Withdraw to Cardano' : 'Deposit to Midgard'}
+      </button>
+      <div 
+        className={`${styles.banner} ${isMidgardEnabled ? styles.enabled : styles.disabled}`}
+        onClick={handleToggle}
+      >
+        <span className={styles.text}>
+          {isMidgardEnabled ? `${t('general.networks.midgard')} mode` : `${t('general.networks.midgard')} mode`}
+        </span>
+        <Switch checked={isMidgardEnabled} size="default" />
+      </div>
     </div>
   ) : (
     <></>
