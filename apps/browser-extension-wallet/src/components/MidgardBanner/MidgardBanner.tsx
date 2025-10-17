@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useWalletStore } from '@src/stores';
 import { toast } from '@lace/common';
 import { Switch } from 'antd';
+import { Button } from '@lace/common';
 import SwitchIcon from '@src/assets/icons/switch.component.svg';
 import styles from './MidgardBanner.module.scss';
 
@@ -32,9 +33,14 @@ export const MidgardBanner = (): React.ReactElement => {
   // Use conditional rendering instead of early return
   return environmentName === 'Preprod' ? (
     <div className={styles.container}>
-      <button className={styles.actionButton} onClick={handleButtonClick}>
+      <Button 
+        color="gradient" 
+        size="medium"
+        className={styles.actionButton}
+        onClick={handleButtonClick}
+      >
         {isMidgardEnabled ? 'Withdraw to Cardano' : 'Deposit to Midgard'}
-      </button>
+      </Button>
       <div 
         className={`${styles.banner} ${isMidgardEnabled ? styles.enabled : styles.disabled}`}
         onClick={handleToggle}
