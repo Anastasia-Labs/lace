@@ -105,8 +105,14 @@ $aside-width-large: 420px;
 .topNavigationBox {
   position: absolute;
   right: 0;
-  // Large value to fit both send and receive buttons, plus dropdown trigger
-  width: 650px;
+  // Anchor to the right and size to content so it expands to the left
+  width: auto;
+  left: auto;
+}
+
+// Ensure the inner navigation box is not constrained by fixed aside widths
+.topNavigationBox .navigationBox {
+  width: auto;
 }
 
 .sidePanelContentBox {
