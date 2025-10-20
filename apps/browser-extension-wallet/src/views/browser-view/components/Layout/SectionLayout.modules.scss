@@ -79,6 +79,7 @@ $aside-width-large: 420px;
 .navigationBox {
   display: flex;
   align-items: center;
+  justify-content: flex-end; // keep items pushed to the right, growing left
   width: $aside-width-large;
   padding-top: 20px;
   gap: 16px;
@@ -108,6 +109,9 @@ $aside-width-large: 420px;
   // Anchor to the right and size to content so it expands to the left
   width: auto;
   left: auto;
+  display: inline-flex; // shrink to content width
+  max-width: max-content; // ensure the box fits its contents only
+  align-items: center;
 }
 
 // Ensure the inner navigation box is not constrained by fixed aside widths
