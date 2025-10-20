@@ -49,6 +49,9 @@
   /* Mobile - make button full width and right below banner */
   @media (max-width: 768px) {
     gap: 8px;
+    /* Swap order: show Midgard banner first, then the action button */
+    .banner { order: 1; }
+    .actionButton { order: 2; }
   }
 }
 
