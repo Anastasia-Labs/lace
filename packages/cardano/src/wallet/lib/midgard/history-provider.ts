@@ -66,15 +66,17 @@ export class MidgardChainHistoryProvider implements ChainHistoryProvider {
 
     try {
       const response = await this.client.request<{
-        cbors: Array<{ type: string; data: number[] }> | Array<number[] | number>;
+        txs: string[];
       }>(`txs?address=${encodeURIComponent(address)}`);
 
-      const cborsList: Uint8Array[] = Array.isArray((response as any).cbors)
-        ? ((response as any).cbors as Array<any>).map((entry) => {
-            // Support both Buffer-like {type,data} and raw number[] encodings
-            if (entry && typeof entry === 'object' && 'data' in entry) return Uint8Array.from(entry.data as number[]);
-            if (Array.isArray(entry)) return Uint8Array.from(entry as number[]);
+      const cborsList: Uint8Array[] = Array.isArray((response as any).txs)
+        ? ((response as any).txs as string[]).map((hexString) => {
+            // Convert hex string to Uint8Array
+            if (typeof hexString === 'string') {
+              return Uint8Array.from(Buffer.from(hexString, 'hex'));
+            }
             // Fallback to empty
+            this.logger.error('[Midgard] Failed to parse tx cbor from /txs endpoint - cbor isn`t a string');
             return new Uint8Array();
           })
         : [];
