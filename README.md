@@ -53,10 +53,14 @@ yarn install
 ### Setup environment variables
 
 ```sh
-cp ./apps/.env.defaults ./apps/.env
+cp ./apps/browser-extension-wallet/.env.defaults ./apps/browser-extension-wallet/.env
 ```
 
-Once `.env` files is created adjust it to your needs, and update `LACE_EXTENSION_KEY`
+
+All the fields in `.env.default` are prepared to work with a local Midgard node, you only need to insert your preprod Blockfrost key:
+```sh
+BLOCKFROST_PROJECT_ID_PREPROD=preprodJb...
+```
 
 > If you want to develop DApp Explorer please refer to the [Setting up local connection with DApp Radar API](apps/browser-extension-wallet/src/views/browser-view/features/dapp/README.md) page
 

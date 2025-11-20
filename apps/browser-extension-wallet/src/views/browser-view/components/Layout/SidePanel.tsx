@@ -9,6 +9,7 @@ import styles from './SectionLayout.modules.scss';
 import { SidePanelButton } from '../SidePanelButton/SidePanelButton';
 import { CollapsiblePanelContainer } from '../CollapsiblePanelContainer/CollapsiblePanelContainer';
 import { BREAKPOINT_SMALL } from '@src/styles/constants';
+import { MidgardBanner } from '@components/MidgardBanner/MidgardBanner';
 
 export const CONTENT_ID = 'content';
 
@@ -64,6 +65,7 @@ export const SidePanel = ({ sidePanelContent, isSidePanelFixed = true }: Section
         [styles.navigationBoxFlexible]: process.env.USE_MULTI_WALLET === 'true'
       })}
     >
+      <MidgardBanner />
       <TransactionCTAsBox />
       <DropdownMenu />
       {!!sidePanelContent && isScreenTooSmallForSidePanel && (

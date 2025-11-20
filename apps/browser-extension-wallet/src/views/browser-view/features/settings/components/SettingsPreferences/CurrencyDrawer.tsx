@@ -3,7 +3,7 @@ import { Radio, RadioChangeEvent, Typography } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { Wallet } from '@lace/cardano';
 import { Drawer, DrawerHeader, DrawerNavigation, logger, toast } from '@lace/common';
-import SwithIcon from '@src/assets/icons/edit.component.svg';
+import SwitchIcon from '@src/assets/icons/edit.component.svg';
 import ErrorIcon from '@src/assets/icons/address-error-icon.component.svg';
 import styles from '../SettingsLayout.module.scss';
 import { useCurrencyStore } from '@providers';
@@ -37,7 +37,7 @@ export const CurrencyDrawer = ({
       toast.notify({
         text: t('browserView.settings.preferences.currency.toast'),
         withProgressBar: true,
-        icon: SwithIcon
+        icon: SwitchIcon
       });
       if (sendCurrencyChangeEvent) {
         sendCurrencyChangeEvent(event.target.value);

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Radio, RadioChangeEvent } from 'antd';
 import { useWalletStore } from '@src/stores';
 import { Wallet } from '@lace/cardano';
-import SwithIcon from '@src/assets/icons/switch.component.svg';
+import SwitchIcon from '@src/assets/icons/switch.component.svg';
 import ErrorIcon from '@src/assets/icons/address-error-icon.component.svg';
 import { config } from '@src/config';
 import { useWalletManager } from '@hooks';
@@ -82,7 +82,7 @@ export const NetworkChoice = ({ section }: { section?: 'settings' | 'wallet-prof
       toast.notify({
         text: t('browserView.settings.wallet.network.networkSwitched'),
         withProgressBar: true,
-        icon: SwithIcon
+        icon: SwitchIcon
       });
       const eventByNetworkName = section === 'settings' ? settingsEventByNetworkName : walletProfileEventByNetworkName;
       await analytics.sendEventToPostHog(eventByNetworkName[event.target.value as Wallet.ChainName]);
