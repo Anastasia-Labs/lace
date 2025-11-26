@@ -10,24 +10,20 @@ import { Wallet } from '@lace/cardano';
 
 const DEPOSIT_AMOUNT = 10_000_000; // 10 ADA in lovelace
 const TX_HASH_PREVIEW_LENGTH = 8;
-const EVENT_WAIT_DURATION = 50_000; // 50 seconds
 
 /* eslint-disable camelcase */
 interface WithdrawalBody {
   l2_outref: {
     txHash: { hash: string };
-    outputIndex: bigint;
+    outputIndex: number | bigint;
   };
   l2_owner: string;
-  l2_value: { lovelace: bigint };
-  l1_address: {
-    paymentCredential: { PublicKeyCredential: [string] };
-    stakeCredential: { Inline: [{ PublicKeyCredential: [string] }] } | undefined;
-  };
-  l1_datum: { Inline: string };
+  l2_value: number | bigint;
+  l1_address: string;
+  l1_datum: string;
 }
 
-type WithdrawalSignature = Record<string, unknown>;
+type WithdrawalSignature = Array<[string, string]>;
 
 const getWalletAddressHex = (walletAddressBech32: string): string => {
   const parsedAddress = Wallet.Cardano.Address.fromBech32(walletAddressBech32);
@@ -63,8 +59,7 @@ const callWithdrawalEndpoint = async (
   midgardUrl: string,
   refundAddressBech32: string,
   withdrawalBody: WithdrawalBody,
-  withdrawalSignature: WithdrawalSignature,
-  inclusionTime: number
+  withdrawalSignature: WithdrawalSignature
 ): Promise<{ txHash: string }> => {
   const response = await fetch(`${midgardUrl}/withdrawal`, {
     method: 'POST',
@@ -75,8 +70,7 @@ const callWithdrawalEndpoint = async (
       withdrawal_body: withdrawalBody,
       withdrawal_signature: withdrawalSignature,
       refund_address: refundAddressBech32,
-      refund_datum: '',
-      inclusion_time: inclusionTime
+      refund_datum: ''
     })
   });
 
@@ -143,30 +137,22 @@ export const MidgardBanner = (): React.ReactElement => {
         const withdrawalBody: WithdrawalBody = {
           l2_outref: {
             txHash: { hash: firstUtxoAddress.txHash },
-            outputIndex: BigInt(firstUtxoAddress.index)
+            outputIndex: firstUtxoAddress.index
           },
           l2_owner: paymentCredHash,
-          l2_value: { lovelace: BigInt(firstUtxoOutput.value.coins) },
-          l1_address: {
-            paymentCredential: { PublicKeyCredential: [paymentCredHash] },
-            stakeCredential: addressProps.delegationPart?.hash
-              ? { Inline: [{ PublicKeyCredential: [addressProps.delegationPart.hash] }] }
-              : undefined
-          },
-          l1_datum: { Inline: '00' }
+          l2_value: firstUtxoOutput.value.coins,
+          l1_address: walletAddressBech32,
+          l1_datum: 'NoDatum'
         };
 
         // TODO: Generate proper withdrawal signature (requires wallet signing)
-        const withdrawalSignature: WithdrawalSignature = {};
-
-        const inclusionTime = Date.now() + EVENT_WAIT_DURATION;
+        const withdrawalSignature: WithdrawalSignature = [];
 
         const result = await callWithdrawalEndpoint(
           midgardUrl,
           walletAddressBech32,
           withdrawalBody,
-          withdrawalSignature,
-          inclusionTime
+          withdrawalSignature
         );
 
         toast.notify({
