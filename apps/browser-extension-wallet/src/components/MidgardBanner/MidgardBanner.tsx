@@ -7,32 +7,25 @@ import SwitchIcon from '@src/assets/icons/switch.component.svg';
 import styles from './MidgardBanner.module.scss';
 import { config } from '@src/config';
 import { Wallet } from '@lace/cardano';
+import { encode as cborEncode } from 'cborg';
 
 const DEPOSIT_AMOUNT = 10_000_000; // 10 ADA in lovelace
 const TX_HASH_PREVIEW_LENGTH = 8;
 
 /* eslint-disable camelcase */
-interface WithdrawalBody {
-  l2_outref: {
-    txHash: { hash: string };
-    outputIndex: number | bigint;
-  };
-  l2_owner: string;
-  l2_value: number | bigint;
-  l1_address: string;
-  l1_datum: string;
-}
 
-type WithdrawalSignature = Array<[string, string]>;
-
-const getWalletAddressHex = (walletAddressBech32: string): string => {
-  const parsedAddress = Wallet.Cardano.Address.fromBech32(walletAddressBech32);
-  return parsedAddress.toBytes();
+/**
+ * Serializes a value to CBOR hex string
+ * Converts JavaScript/TypeScript structures to CBOR binary format and encodes as hex
+ */
+const serializeToCborHex = (data: unknown): string => {
+  const cborBytes = cborEncode(data);
+  return Buffer.from(cborBytes).toString('hex');
 };
 
 const callDepositEndpoint = async (
   midgardUrl: string,
-  addressHex: string,
+  addressBech32: string,
   amount: number
 ): Promise<{ txHash: string }> => {
   const response = await fetch(`${midgardUrl}/deposit`, {
@@ -41,9 +34,9 @@ const callDepositEndpoint = async (
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      amount,
-      address: addressHex,
-      datum: undefined
+      amount: amount.toString(),
+      address: addressBech32,
+      datum: null
     })
   });
 
@@ -58,19 +51,38 @@ const callDepositEndpoint = async (
 const callWithdrawalEndpoint = async (
   midgardUrl: string,
   refundAddressBech32: string,
-  withdrawalBody: WithdrawalBody,
-  withdrawalSignature: WithdrawalSignature
+  l2OutrefTxHash: string,
+  l2OutrefIndex: number,
+  l2Owner: string,
+  l2Value: bigint,
+  l1AddressBech32: string
 ): Promise<{ txHash: string }> => {
+  // Construct withdrawal body
+  const withdrawalBody = {
+    l2_outref: {
+      txHash: { hash: l2OutrefTxHash },
+      outputIndex: l2OutrefIndex
+    },
+    l2_owner: l2Owner,
+    l2_value: l2Value.toString(),
+    l1_address: l1AddressBech32,
+    l1_datum: 'NoDatum'
+  };
+
+  // Serialize withdrawal_body and withdrawal_signature to CBOR hex
+  const withdrawalBodyCbor = serializeToCborHex(withdrawalBody);
+  const withdrawalSignatureCbor = serializeToCborHex(new Map()); // Empty signature map
+
   const response = await fetch(`${midgardUrl}/withdrawal`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      withdrawal_body: withdrawalBody,
-      withdrawal_signature: withdrawalSignature,
+      withdrawal_body: withdrawalBodyCbor,
+      withdrawal_signature: withdrawalSignatureCbor,
       refund_address: refundAddressBech32,
-      refund_datum: ''
+      refund_datum: null
     })
   });
 
@@ -134,25 +146,14 @@ export const MidgardBanner = (): React.ReactElement => {
           throw new Error('Could not extract payment credential from address');
         }
 
-        const withdrawalBody: WithdrawalBody = {
-          l2_outref: {
-            txHash: { hash: firstUtxoAddress.txHash },
-            outputIndex: firstUtxoAddress.index
-          },
-          l2_owner: paymentCredHash,
-          l2_value: firstUtxoOutput.value.coins,
-          l1_address: walletAddressBech32,
-          l1_datum: 'NoDatum'
-        };
-
-        // TODO: Generate proper withdrawal signature (requires wallet signing)
-        const withdrawalSignature: WithdrawalSignature = [];
-
         const result = await callWithdrawalEndpoint(
           midgardUrl,
           walletAddressBech32,
-          withdrawalBody,
-          withdrawalSignature
+          firstUtxoAddress.txHash,
+          firstUtxoAddress.index,
+          paymentCredHash,
+          firstUtxoOutput.value.coins,
+          walletAddressBech32
         );
 
         toast.notify({
@@ -162,8 +163,7 @@ export const MidgardBanner = (): React.ReactElement => {
         });
       } else {
         // Deposit flow
-        const addressHex = getWalletAddressHex(walletAddressBech32);
-        const result = await callDepositEndpoint(midgardUrl, addressHex, DEPOSIT_AMOUNT);
+        const result = await callDepositEndpoint(midgardUrl, walletAddressBech32, DEPOSIT_AMOUNT);
 
         toast.notify({
           text: `Deposit successful! TX: ${result.txHash?.slice(0, TX_HASH_PREVIEW_LENGTH)}...`,

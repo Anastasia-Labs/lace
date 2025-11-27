@@ -12473,6 +12473,7 @@ __metadata:
     blake2b-no-wasm: 2.1.4
     bottleneck: ^2.19.5
     buffer: 6.0.3
+    cborg: ^4.3.1
     classnames: 2.3.1
     dayjs: 1.10.7
     dexie: ^3.2.2
@@ -28678,6 +28679,15 @@ __metadata:
   dependencies:
     nofilter: ^3.1.0
   checksum: 925edae7bf964be5a26dba1b7ba6311ac12b6a66234dc958958997a0576cdc740632dc19852a5b84d8a75101936bea1fe122dc22539d6e11f4539c731853ba2e
+  languageName: node
+  linkType: hard
+
+"cborg@npm:^4.3.1":
+  version: 4.3.1
+  resolution: "cborg@npm:4.3.1"
+  bin:
+    cborg: lib/bin.js
+  checksum: e85335794d991d504d8ebc38a43c9501151f06db1ceac479cfe59b3a12e08eeeb4e6c8aaf05a36501aeedd673d770d0b6abdd5cbe3f63baea0ee25c36b78f5d2
   languageName: node
   linkType: hard
 
