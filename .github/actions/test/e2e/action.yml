@@ -35,6 +35,10 @@ inputs:
   FIREFOX_BINARY:
     description: 'Location of the Firefox binary'
     required: false
+  LMP_BUNDLE:
+    description: 'Run tests on LMP bundle'
+    required: false
+    default: 'false'
 
 runs:
   using: 'composite'
@@ -51,7 +55,7 @@ runs:
       if: success()
       shell: bash
       id: e2e-tests
-      working-directory: ./packages/e2e-tests
+      working-directory: ./v1/packages/e2e-tests
       env:
         WALLET_1_PASSWORD: ${{ inputs.WALLET_PASSWORD }}
         TEST_DAPP_URL: ${{ inputs.TEST_DAPP_URL }}
@@ -60,6 +64,7 @@ runs:
         BATCH: ${{ inputs.BATCH }}
         SERVICE_WORKER_LOGS: ${{ inputs.SERVICE_WORKER_LOGS }}
         FIREFOX_BINARY:  ${{ inputs.FIREFOX_BINARY }}
+        LMP_BUNDLE: ${{ inputs.LMP_BUNDLE }}
       run: |
         commonTags="@Testnet and not @Pending"
         tagsToRun="'${commonTags}'"
@@ -76,7 +81,7 @@ runs:
     - name: Save dmesg logs
       shell: bash
       if: always()
-      working-directory: ./packages/e2e-tests
+      working-directory: ./v1/packages/e2e-tests
       run: |
         sudo dmesg > ./dmesg.log
 
@@ -88,9 +93,9 @@ runs:
       with:
         name: runner-artifacts-${{ env.BATCH }}
         path: |
-          ./packages/e2e-tests/screenshots
-          ./packages/e2e-tests/logs
-          ./packages/e2e-tests/reports/allure/results
-          ./packages/e2e-tests/dmesg.log
-          ./packages/e2e-tests/metrics
+          ./v1/packages/e2e-tests/screenshots
+          ./v1/packages/e2e-tests/logs
+          ./v1/packages/e2e-tests/reports/allure/results
+          ./v1/packages/e2e-tests/dmesg.log
+          ./v1/packages/e2e-tests/metrics
         retention-days: 5

@@ -1,4 +1,7 @@
 .idea
+.pnp.cjs
+node_modules
+dist
 .env
 .history
 .lh
@@ -34,5 +37,3 @@ result
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
-
-yalc.lock

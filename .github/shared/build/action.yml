@@ -110,6 +110,17 @@ inputs:
       description: ' ADA handle cache lifetime'
       required: false
       default: 600000
+  NOTIFICATION_CENTER_MODE:
+    description: 'Notifications center service mode: "production" (default, PubNub service), "test" (test API for injecting notifications), or "noop" (no service)'
+    required: false
+    default: 'production'
+  PUBNUB_SUBSCRIBE_KEY:
+    description: 'PubNub subscribe key for notifications'
+    required: true
+  PUBNUB_TOKEN_ENDPOINT:
+    description: 'PubNub token endpoint URL for authentication. If not provided, uses default PubNub endpoint'
+    required: false
+    default: ''
 runs:
   using: 'composite'
   steps:
@@ -117,7 +128,6 @@ runs:
       uses: actions/setup-node@v4
       with:
         node-version-file: '.nvmrc'
-        cache: 'yarn'
 
     - name: Node modules cache
       uses: actions/cache@v4
@@ -125,7 +135,11 @@ runs:
         path: |
           node_modules
           **/node_modules
-        key: ${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+        key: ${{ runner.os }}-${{ hashFiles('yarn.lock', 'v1/yarn.lock') }}
+
+    - name: Enable Corepack
+      shell: bash
+      run: corepack enable
 
     - name: Configure Yarn to use GitHub Packages
       run: |
@@ -153,8 +167,14 @@ runs:
       shell: bash
       run: yarn install --immutable --inline-builds
 
+    - name: Install v1 dependencies
+      shell: bash
+      working-directory: ./v1
+      run: yarn install --immutable --inline-builds
+
     - name: Build dist version
       shell: bash
+      working-directory: ./v1
       env:
         NODE_OPTIONS: '--max_old_space_size=8192'
         BUILD_DEV_PREVIEW: ${{ inputs.BUILD_DEV_PREVIEW }}
@@ -185,4 +205,7 @@ runs:
         BROWSER: ${{ inputs.BROWSER_TARGET }}
         E2E_FORCE_TREZOR_PICKED: ${{ inputs.E2E_FORCE_TREZOR_PICKED }}
         HANDLE_RESOLUTION_CACHE_LIFETIME: ${{ inputs.HANDLE_RESOLUTION_CACHE_LIFETIME }}
+        NOTIFICATION_CENTER_MODE: ${{ inputs.NOTIFICATION_CENTER_MODE }}
+        PUBNUB_SUBSCRIBE_KEY: ${{ inputs.PUBNUB_SUBSCRIBE_KEY }}
+        PUBNUB_TOKEN_ENDPOINT: ${{ inputs.PUBNUB_TOKEN_ENDPOINT }}
       run: yarn browser build

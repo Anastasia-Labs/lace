@@ -1,0 +1,22 @@
+import { TimelineStep } from '../SharedWalletLayout';
+
+export const keyGenerationTimelineSteps: TimelineStep<string>[] = [
+  {
+    key: 'enter-password',
+    name: 'sharedWallets.addSharedWallet.keyGeneration.enterPassword.timeline.enterPassword',
+  },
+  {
+    key: 'copy-key',
+    name: 'sharedWallets.addSharedWallet.keyGeneration.enterPassword.timeline.copyKey',
+  },
+];
+export const keyGenerationHWTimelineSteps: TimelineStep<string>[] = [
+  {
+    key: 'enter-password',
+    name: 'sharedWallets.addSharedWallet.keyGeneration.enterPassword.timeline.confirmAccess',
+  },
+  {
+    key: 'copy-key',
+    name: 'sharedWallets.addSharedWallet.keyGeneration.enterPassword.timeline.copyKey',
+  },
+];
