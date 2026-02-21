@@ -27,11 +27,7 @@
   ],
   "scripts": {
     "build": "run -T rollup -c rollup.config.js",
-<<<<<<< HEAD:packages/core/package.json
-    "build-storybook": "NODE_OPTIONS=; build-storybook",
-=======
     "build-storybook": "build-storybook",
->>>>>>> upstream/main:v1/packages/core/package.json
     "cleanup": "yarn exec rm -rf dist node_modules",
     "dev": "yarn run storybook",
     "format-check": "echo \"@lace/core: no format-check command specified\"",
@@ -39,11 +35,7 @@
     "prepack": "yarn build",
     "prestart": "yarn build",
     "start": "node dist/index.js",
-<<<<<<< HEAD:packages/core/package.json
-    "storybook": "NODE_OPTIONS=; start-storybook -p 6006",
-=======
     "storybook": "start-storybook -p 6006",
->>>>>>> upstream/main:v1/packages/core/package.json
     "test": "NODE_ENV=test run -T jest -c ./test/jest.config.js --silent",
     "type-check": "echo \"@lace/core: no type-check command specified\"",
     "watch": "yarn build --watch"
