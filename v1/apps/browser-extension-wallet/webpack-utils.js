@@ -41,10 +41,20 @@ const transformManifest = (content, mode, jsAssets = []) => {
       process.env.BLOCKFROST_URL_SANCHONET
     ].join(' ');
 
+    const midgardUrls = [
+      process.env.MIDGARD_URL_MAINNET,
+      process.env.MIDGARD_URL_PREPROD,
+      process.env.MIDGARD_URL_PREVIEW,
+      process.env.MIDGARD_URL_SANCHONET
+    ]
+      .filter(Boolean)
+      .join(' ');
+
     manifest.content_security_policy.extension_pages = manifest.content_security_policy.extension_pages
       .replace('$CARDANO_WS_SERVER_URLS', cardanoWsServicesUrls)
       .replace('$CARDANO_SERVICES_URLS', cardanoServicesUrls)
       .replace('$BLOCKFROST_URLS', blockfrostUrls)
+      .replace('$MIDGARD_URLS', midgardUrls)
       .replace('$MAESTRO_URLS', `${process.env.MAESTRO_URL_MAINNET} ${process.env.MAESTRO_URL_TESTNET}`)
       .replace('$LOCALHOST_DEFAULT_SRC', mode === 'development' ? 'http://localhost:3000' : '')
       .replace(

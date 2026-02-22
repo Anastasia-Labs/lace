@@ -13,11 +13,8 @@ import { BrowserViewSections } from '@lib/scripts/types';
 import { NetworkPill } from '@components/NetworkPill';
 import { useAnalyticsContext } from '@providers';
 import { PostHogAction } from '@providers/AnalyticsProvider/analyticsTracker';
-<<<<<<< HEAD:apps/browser-extension-wallet/src/components/MainMenu/MainHeader.tsx
-import { MidgardBanner } from '@components/MidgardBanner/MidgardBanner';
-=======
 import { NotificationsBellContainer } from '@src/features/notifications-center';
->>>>>>> upstream/main:v1/apps/browser-extension-wallet/src/components/MainMenu/MainHeader.tsx
+import { MidgardBanner } from '@components/MidgardBanner/MidgardBanner';
 
 export const MainHeader = (): React.ReactElement => {
   const { t } = useTranslation();
@@ -65,12 +62,10 @@ export const MainHeader = (): React.ReactElement => {
                 .then(() => window.close())
             }
           />
+          <MidgardBanner />
           <NotificationsBellContainer popupView />
           <DropdownMenu isPopup />
         </div>
-      </div>
-      <div className={styles.bannerContainer}>
-        <MidgardBanner />
       </div>
     </div>
   );

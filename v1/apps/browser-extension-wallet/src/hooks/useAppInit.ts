@@ -9,13 +9,10 @@ import { setBackgroundStorage } from '@lib/scripts/background/storage';
 import { useCustomSubmitApi } from '@hooks/useCustomSubmitApi';
 import { bitcoinWalletManager } from '@lib/wallet-api-ui';
 import { useCurrentBlockchain } from '@src/multichain';
-<<<<<<< HEAD:apps/browser-extension-wallet/src/hooks/useAppInit.ts
-import { useMidgardRefresh } from './useMidgardRefresh';
-=======
 import { useBackgroundServiceAPIContext } from '@providers';
+import { useMidgardRefresh } from './useMidgardRefresh';
 import { initI18n } from '@lace/translation';
 import { Message, MessageTypes } from '@lib/scripts/types';
->>>>>>> upstream/main:v1/apps/browser-extension-wallet/src/hooks/useAppInit.ts
 
 export const useAppInit = (): void => {
   const {
@@ -33,12 +30,9 @@ export const useAppInit = (): void => {
   const walletState = useWalletState();
   const { environmentName, currentChain } = useWalletStore();
   const { getCustomSubmitApiForNetwork } = useCustomSubmitApi();
-<<<<<<< HEAD:apps/browser-extension-wallet/src/hooks/useAppInit.ts
-  
-  // Initialize Midgard refresh listener
-  useMidgardRefresh();
-=======
   const backgroundServices = useBackgroundServiceAPIContext();
+
+  useMidgardRefresh();
 
   useEffect(() => {
     const subscription = backgroundServices.requestMessage$?.subscribe(({ type, data }: Message): void => {
@@ -60,7 +54,6 @@ export const useAppInit = (): void => {
 
     return () => subscription.unsubscribe();
   }, [backgroundServices]);
->>>>>>> upstream/main:v1/apps/browser-extension-wallet/src/hooks/useAppInit.ts
 
   useEffect(() => {
     setWalletState(walletState);

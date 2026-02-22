@@ -40,11 +40,13 @@ import { BlockfrostInputResolver } from './blockfrost-input-resolver';
 import { initHandleService } from './handleService';
 import { initStakePoolService } from './stakePoolService';
 import { ChainName } from '../types';
+import { MidgardClient, MidgardUtxoProvider, MidgardTxSubmitProvider } from '@lace/midgard';
 
 const createTxSubmitProvider = (
   blockfrostClient: BlockfrostClient,
   httpProviderConfig: CreateHttpProviderConfig<Provider>,
-  customSubmitTxUrl?: string
+  customSubmitTxUrl?: string,
+  midgardClient?: MidgardClient
 ): TxSubmitProvider => {
   if (customSubmitTxUrl) {
     httpProviderConfig.logger.debug(`Using custom TxSubmit api URL ${customSubmitTxUrl}`);
@@ -55,6 +57,11 @@ const createTxSubmitProvider = (
       { baseUrl: url, path: url.pathname },
       { logger: httpProviderConfig.logger, adapter: httpProviderConfig.adapter }
     );
+  }
+
+  if (midgardClient) {
+    httpProviderConfig.logger.debug('Using Midgard TxSubmit provider');
+    return new MidgardTxSubmitProvider(midgardClient, httpProviderConfig.logger);
   }
 
   return new BlockfrostTxSubmitProvider(blockfrostClient, httpProviderConfig.logger);
@@ -86,6 +93,7 @@ interface ProvidersConfig {
     baseKoraLabsServicesUrl: string;
     customSubmitTxUrl?: string;
     blockfrostConfig: BlockfrostClientConfig & { rateLimiter: RateLimiter };
+    midgardConfig?: { baseUrl: string; rateLimiter: RateLimiter };
   };
   logger: Logger;
   experiments: {
@@ -139,7 +147,7 @@ const cacheAssignment: Record<CacheName, { count: number; size: number }> = {
 export const createProviders = ({
   axiosAdapter,
   chainName,
-  env: { baseCardanoServicesUrl: baseUrl, baseKoraLabsServicesUrl, customSubmitTxUrl, blockfrostConfig },
+  env: { baseCardanoServicesUrl: baseUrl, baseKoraLabsServicesUrl, customSubmitTxUrl, blockfrostConfig, midgardConfig },
   logger,
   experiments: { useWebSocket, useBlockfrostCredentialQueries },
   extensionLocalStorage
@@ -149,6 +157,11 @@ export const createProviders = ({
   const blockfrostClient = new BlockfrostClient(blockfrostConfig, {
     rateLimiter: blockfrostConfig.rateLimiter
   });
+
+  const midgardClient = midgardConfig ? new MidgardClient(midgardConfig, logger) : undefined;
+
+  logger.info(`Using ${midgardClient ? 'Midgard' : 'Blockfrost'} providers`);
+
   const assetProvider = new BlockfrostAssetProvider(blockfrostClient, logger);
   const networkInfoProvider = new BlockfrostNetworkInfoProvider(blockfrostClient, logger);
   const chainHistoryProvider = new BlockfrostChainHistoryProvider(
@@ -172,7 +185,12 @@ export const createProviders = ({
     extensionLocalStorage,
     networkInfoProvider
   });
-  const txSubmitProvider = createTxSubmitProvider(blockfrostClient, httpProviderConfig, customSubmitTxUrl);
+  const txSubmitProvider = createTxSubmitProvider(
+    blockfrostClient,
+    httpProviderConfig,
+    customSubmitTxUrl,
+    midgardClient
+  );
   const dRepProvider = new BlockfrostDRepProvider(blockfrostClient, logger);
 
   const addressDiscovery = new BlockfrostAddressDiscovery(blockfrostClient, logger);
@@ -235,19 +253,31 @@ export const createProviders = ({
     };
   }
 
-  const utxoProvider = new BlockfrostUtxoProvider(
-    { queryUtxosByCredentials: useBlockfrostCredentialQueries },
-    {
-      cache: createPersistentCacheStorage({
-        extensionLocalStorage,
-        fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
-        resourceName: CacheName.utxoProvider,
-        quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
-      }),
-      client: blockfrostClient,
-      logger
-    }
-  );
+  const utxoProvider = midgardClient
+    ? new MidgardUtxoProvider(
+        midgardClient,
+        blockfrostClient,
+        logger,
+        createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
+          resourceName: CacheName.utxoProvider,
+          quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
+        })
+      )
+    : new BlockfrostUtxoProvider(
+        { queryUtxosByCredentials: useBlockfrostCredentialQueries },
+        {
+          cache: createPersistentCacheStorage({
+            extensionLocalStorage,
+            fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.utxoProvider].count,
+            resourceName: CacheName.utxoProvider,
+            quotaInBytes: cacheAssignment[CacheName.utxoProvider].size
+          }),
+          client: blockfrostClient,
+          logger
+        }
+      );
 
   return {
     assetProvider,

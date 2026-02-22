@@ -1,0 +1,60 @@
+{
+  "name": "@lace/midgard",
+  "version": "0.1.0",
+  "description": "Midgard Layer 2 scaling solution package",
+  "homepage": "https://github.com/input-output-hk/lace/blob/master/packages/midgard/README.md",
+  "bugs": {
+    "url": "https://github.com/input-output-hk/lace/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/input-output-hk/lace.git"
+  },
+  "license": "Apache-2.0",
+  "author": "Lace",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "typings": "dist/index.d.ts",
+  "directories": {
+    "lib": "src",
+    "test": "test"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "run -T rollup -c rollup.config.js",
+    "cleanup": "yarn exec rm -rf dist node_modules",
+    "format-check": "echo \"@lace/midgard: no format-check command specified\"",
+    "lint": "cd ../.. && yarn midgard:lint",
+    "prepack": "yarn build",
+    "prepare": "ts-patch install -s",
+    "prestart": "yarn build",
+    "start": "node dist/index.js",
+    "test": "NODE_ENV=test run -T jest -c ./test/jest.config.js --silent",
+    "tsc:declarationOnly": "tsc --project ./src/tsconfig.declarationOnly.json",
+    "type-check": "echo \"@lace/midgard: no type-check command specified\"",
+    "watch": "yarn build --watch"
+  },
+  "dependencies": {
+    "@cardano-sdk/cardano-services-client": "0.26.30",
+    "@cardano-sdk/core": "0.46.11",
+    "@cardano-sdk/util": "0.17.1",
+    "@lace/common": "0.1.0",
+    "lodash": "4.17.21",
+    "rxjs": "7.4.0"
+  },
+  "devDependencies": {
+    "rollup-plugin-polyfill-node": "^0.8.0",
+    "ts-log": "^2.2.7",
+    "type-fest": "^4.26.1",
+    "typescript": "^4.9.5"
+  },
+  "peerDependencies": {
+    "react": "17.0.2",
+    "react-dom": "17.0.2"
+  }
+}
