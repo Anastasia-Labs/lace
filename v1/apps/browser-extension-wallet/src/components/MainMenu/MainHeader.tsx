@@ -62,10 +62,12 @@ export const MainHeader = (): React.ReactElement => {
                 .then(() => window.close())
             }
           />
-          <MidgardBanner />
           <NotificationsBellContainer popupView />
           <DropdownMenu isPopup />
         </div>
+      </div>
+      <div className={styles.bannerContainer}>
+        <MidgardBanner />
       </div>
     </div>
   );

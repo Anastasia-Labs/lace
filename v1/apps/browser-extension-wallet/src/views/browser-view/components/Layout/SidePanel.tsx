@@ -66,8 +66,8 @@ export const SidePanel = ({ sidePanelContent, isSidePanelFixed = true }: Section
         [styles.navigationBoxFlexible]: process.env.USE_MULTI_WALLET === 'true'
       })}
     >
-      <TransactionCTAsBox />
       <MidgardBanner />
+      <TransactionCTAsBox />
       <NotificationsBellContainer />
       <DropdownMenu />
       {!!sidePanelContent && isScreenTooSmallForSidePanel && (
