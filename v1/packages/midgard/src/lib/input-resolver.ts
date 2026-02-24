@@ -1,4 +1,4 @@
-/* eslint-disable unicorn/no-null, @typescript-eslint/no-non-null-assertion */
+/* eslint-disable unicorn/no-null */
 import { Cardano } from '@cardano-sdk/core';
 import type { Cache } from '@cardano-sdk/util';
 import { Logger } from 'ts-log';
@@ -57,35 +57,39 @@ export class MidgardInputResolver implements Cardano.InputResolver {
    * @private
    */
   private resolveFromHints(input: Cardano.TxIn, options?: Cardano.ResolveOptions): Cardano.TxOut | null {
-    if (!options?.hints?.transactions) return null;
+    if (options?.hints?.transactions) {
+      const tx = options.hints.transactions.find((t) => t.id === input.txId);
+      if (tx) {
+        const output = tx.body.outputs[input.index];
+        if (output) {
+          this.#logger.debug(`Resolved input ${input.txId}#${input.index} from hint transactions`);
+          void this.#txCache.set(txInToId(input), output);
+          return output;
+        }
+      }
+    }
 
-    const tx = options.hints.transactions.find((t) => t.id === input.txId);
-    if (!tx) return null;
+    if (options?.hints?.utxos) {
+      for (const utxo of options.hints.utxos) {
+        if (input.txId === utxo[0].txId && input.index === utxo[0].index) {
+          this.#logger.debug(`Resolved input ${input.txId}#${input.index} from hint utxos`);
+          void this.#txCache.set(txInToId(input), utxo[1]);
+          return utxo[1];
+        }
+      }
+    }
 
-    const output = tx.body.outputs[input.index];
-    if (!output) return null;
-
-    return output;
+    return null;
   }
 
   /**
    * Fetches the transaction output from the Midgard API and caches it.
    * @param input - The transaction input to resolve.
    * @private
+   * TODO: Implement actual Midgard API call to fetch transaction output by txId
    */
   private async fetchAndCacheTxOut(input: Cardano.TxIn): Promise<Cardano.TxOut | null> {
-    try {
-      // For now, we'll use a placeholder implementation
-      // In a real implementation, you would make a request to Midgard API
-      // to fetch the transaction output for the given input
-      this.#logger.debug(`Fetching transaction output for ${input.txId}#${input.index} from Midgard`);
-
-      // Placeholder: return null for now
-      // TODO: Implement actual Midgard API call to fetch transaction output
-      return null;
-    } catch (error) {
-      this.#logger.error(`Failed to fetch transaction output for ${input.txId}#${input.index}:`, error);
-      return null;
-    }
+    this.#logger.debug(`No remote fetch implemented for ${input.txId}#${input.index}`);
+    return null;
   }
 }

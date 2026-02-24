@@ -1,5 +1,6 @@
 import { Logger } from 'ts-log';
 import { TxSubmitProvider } from '@cardano-sdk/core';
+import { HexBlob } from '@cardano-sdk/util';
 import { MidgardClient } from './client';
 
 /**
@@ -16,18 +17,14 @@ export class MidgardTxSubmitProvider implements TxSubmitProvider {
   }
 
   /**
-   * Submit a signed transaction to the Midgard network
-   * Sends CBOR directly as hex string via query parameter (backend expects this format)
+   * Submit a signed transaction to the Midgard network.
+   * The SDK passes a HexBlob (hex string) as signedTransaction despite the Uint8Array type in the interface.
+   * The Midgard backend expects the CBOR as a query parameter: POST /submit?tx_cbor=<hex>
    */
   async submitTx({ signedTransaction }: { signedTransaction: Uint8Array }): Promise<void> {
-    // Note: Despite the Uint8Array type, this actually comes in as a hex string
-    const cborHex = String(signedTransaction);
-
-    // Backend expects: POST /submit?tx_cbor=<hex_string>
-    // No request body needed, just the query parameter
-    await this.#midgardClient.post(`submit?tx_cbor=${cborHex}`, {});
-
-    this.#logger.info('[Midgard] Transaction submitted successfully to Midgard backend');
+    const cborHex = signedTransaction as unknown as HexBlob;
+    await this.#midgardClient.post(`submit?tx_cbor=${cborHex}`);
+    this.#logger.info('[Midgard] Transaction submitted successfully');
   }
 
   /**
@@ -35,15 +32,15 @@ export class MidgardTxSubmitProvider implements TxSubmitProvider {
    */
   async healthCheck(): Promise<{ ok: boolean }> {
     try {
-      // Try Midgard health check
-      const midgardHealth = await this.#midgardClient.request<{ status: string }>('health');
+      const { status } = await this.#midgardClient.request<{ status: string }>('health');
 
-      if (midgardHealth?.status === 'healthy') {
+      if (status === 'healthy') {
         this.#logger.debug('[Midgard] Health check passed');
         return { ok: true };
       }
 
-      throw new Error('Midgard health check failed');
+      this.#logger.warn('[Midgard] Health check returned non-healthy status:', status);
+      return { ok: false };
     } catch (error) {
       this.#logger.error('[Midgard] Health check failed:', error);
       return { ok: false };

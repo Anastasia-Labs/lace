@@ -40,7 +40,7 @@ import { BlockfrostInputResolver } from './blockfrost-input-resolver';
 import { initHandleService } from './handleService';
 import { initStakePoolService } from './stakePoolService';
 import { ChainName } from '../types';
-import { MidgardClient, MidgardUtxoProvider, MidgardTxSubmitProvider } from '@lace/midgard';
+import { MidgardClient, MidgardUtxoProvider, MidgardTxSubmitProvider, MidgardInputResolver } from '@lace/midgard';
 
 const createTxSubmitProvider = (
   blockfrostClient: BlockfrostClient,
@@ -202,16 +202,26 @@ export const createProviders = ({
     stakePoolProvider
   });
 
-  const inputResolver = new BlockfrostInputResolver({
-    cache: createPersistentCacheStorage({
-      extensionLocalStorage,
-      fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.inputResolver].count,
-      resourceName: CacheName.inputResolver,
-      quotaInBytes: cacheAssignment[CacheName.inputResolver].size
-    }),
-    client: blockfrostClient,
-    logger
-  });
+  const inputResolver = midgardClient
+    ? new MidgardInputResolver({
+        cache: createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.inputResolver].count,
+          resourceName: CacheName.inputResolver,
+          quotaInBytes: cacheAssignment[CacheName.inputResolver].size
+        }),
+        logger
+      })
+    : new BlockfrostInputResolver({
+        cache: createPersistentCacheStorage({
+          extensionLocalStorage,
+          fallbackMaxCollectionItemsGuard: cacheAssignment[CacheName.inputResolver].count,
+          resourceName: CacheName.inputResolver,
+          quotaInBytes: cacheAssignment[CacheName.inputResolver].size
+        }),
+        client: blockfrostClient,
+        logger
+      });
 
   const handleProvider = initHandleService({
     adapter: axiosAdapter,

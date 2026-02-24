@@ -16,82 +16,52 @@ export class MidgardError extends Error {
 
 /**
  * MidgardClient - A client for making requests to Midgard API endpoints
- * This class implements a similar interface to BlockfrostClient for compatibility
  */
 export class MidgardClient {
-  private readonly config: MidgardClientConfig;
-  private readonly logger: Logger;
+  readonly #baseUrl: string;
+  readonly #rateLimiter: RateLimiter;
+  readonly #logger: Logger;
 
-  constructor(config: MidgardClientConfig, logger: Logger) {
-    this.config = config;
-    this.logger = logger;
+  constructor({ baseUrl, rateLimiter }: MidgardClientConfig, logger: Logger) {
+    this.#baseUrl = baseUrl.replace(/\/$/, '');
+    this.#rateLimiter = rateLimiter;
+    this.#logger = logger;
   }
 
   /**
-   * Makes a request to the Midgard API
+   * Makes a GET request to the Midgard API
    * @param endpoint - The API endpoint (e.g., 'utxos/{address}')
    * @returns Promise with the response data
    */
   async request<T>(endpoint: string): Promise<T> {
-    const url = `${this.config.baseUrl}/${endpoint}`;
-
-    this.logger.debug(`Making Midgard request to: ${url}`);
-
-    try {
-      // Use the rate limiter to respect rate limits
-      const response = await this.config.rateLimiter.schedule(async () => {
-        const res = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!res.ok) {
-          throw new MidgardError(res.status, `HTTP ${res.status}: ${res.statusText}`);
-        }
-
-        return res.json();
-      });
-
-      return response as T;
-    } catch (error) {
-      this.logger.error(`Midgard request failed for endpoint ${endpoint}:`, error);
-      throw error;
-    }
+    return this.#doRequest<T>(endpoint, 'GET');
   }
 
   /**
    * Makes a POST request to the Midgard API
    * @param endpoint - The API endpoint
-   * @param data - The data to send
    * @returns Promise with the response data
    */
-  async post<T>(endpoint: string, data: Record<string, unknown>): Promise<T> {
-    const url = `${this.config.baseUrl}/${endpoint}`;
+  async post<T>(endpoint: string): Promise<T> {
+    return this.#doRequest<T>(endpoint, 'POST');
+  }
 
-    this.logger.debug(`Making Midgard POST request to: ${url}`);
+  async #doRequest<T>(endpoint: string, method: 'GET' | 'POST'): Promise<T> {
+    const url = `${this.#baseUrl}/${endpoint}`;
+    this.#logger.debug(`Midgard ${method} ${url}`);
 
     try {
-      const response = await this.config.rateLimiter.schedule(async () => {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-        });
+      return await this.#rateLimiter.schedule(async () => {
+        const res = await fetch(url, { method });
 
         if (!res.ok) {
           throw new MidgardError(res.status, `HTTP ${res.status}: ${res.statusText}`);
         }
 
-        return res.json();
+        return res.json() as Promise<T>;
       });
-
-      return response as T;
     } catch (error) {
-      this.logger.error(`Midgard POST request failed for endpoint ${endpoint}:`, error);
+      this.#logger.error(`Midgard ${method} failed for ${endpoint}:`, error);
       throw error;
     }
   }

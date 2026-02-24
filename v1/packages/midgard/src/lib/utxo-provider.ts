@@ -6,54 +6,46 @@ import { HexBlob } from '@cardano-sdk/util';
 import { MidgardClient } from './client';
 
 /**
- * MidgardUtxoProvider - Uses Midgard client with automatic fallback to Blockfrost
- * When Midgard requests fail, it automatically falls back to Blockfrost
+ * MidgardUtxoProvider - Fetches UTxOs from Midgard L2 with automatic fallback to Blockfrost.
+ * When a Midgard request fails for an address, that address falls back to Blockfrost L1.
  */
 export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
   private readonly midgardClient: MidgardClient;
-  protected readonly logger: Logger;
+  private readonly midgardLogger: Logger;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructor(midgardClient: MidgardClient, blockfrostClient: BlockfrostClient, logger: Logger, cache: Cache<any>) {
-    super({
-      client: blockfrostClient,
-      cache,
-      logger
-    });
+    super({ client: blockfrostClient, cache, logger });
     this.midgardClient = midgardClient;
-    this.logger = logger;
+    this.midgardLogger = logger;
   }
 
   /**
-   * Transform Midgard UTxO data to Cardano SDK format using CBOR decoding
+   * Transform a raw Midgard UTxO (CBOR-encoded outref + value) into the Cardano SDK tuple format.
    */
   private transformMidgardUtxo(midgardUtxo: { outref: string; value: string }): Cardano.Utxo | undefined {
+    let result: Cardano.Utxo | undefined;
     try {
-      const txInput = Serialization.TransactionInput.fromCbor(midgardUtxo.outref as unknown as HexBlob);
-      const txOutput = Serialization.TransactionOutput.fromCbor(midgardUtxo.value as unknown as HexBlob);
+      const coreInput = Serialization.TransactionInput.fromCbor(midgardUtxo.outref as unknown as HexBlob).toCore();
+      const coreOutput = Serialization.TransactionOutput.fromCbor(midgardUtxo.value as unknown as HexBlob).toCore();
 
       const txIn: Cardano.HydratedTxIn = {
-        txId: txInput.toCore().txId,
-        index: txInput.toCore().index,
-        address: txOutput.toCore().address
+        txId: coreInput.txId,
+        index: coreInput.index,
+        address: coreOutput.address
       };
 
-      const txOut: Cardano.TxOut = {
-        address: txOutput.toCore().address,
-        value: txOutput.toCore().value
-      };
-
-      return [txIn, txOut] as Cardano.Utxo | undefined;
+      result = [txIn, coreOutput];
     } catch (error) {
-      this.logger.error('[Midgard] Failed to transform UTxO:', midgardUtxo, error);
-      return undefined as Cardano.Utxo | undefined;
+      this.midgardLogger.error('[Midgard] Failed to transform UTxO:', midgardUtxo, error);
     }
+    return result;
   }
 
   /**
-   * Fetch UTxOs from Midgard with automatic fallback to Blockfrost
+   * Fetch UTxOs by address from Midgard, falling back to Blockfrost if Midgard is unavailable.
    */
-  async utxoByAddresses({ addresses }: { addresses: string[] }): Promise<Cardano.Utxo[]> {
+  async utxoByAddresses({ addresses }: { addresses: Cardano.PaymentAddress[] }): Promise<Cardano.Utxo[]> {
     const allUtxos: Cardano.Utxo[] = [];
 
     for (const address of addresses) {
@@ -62,19 +54,22 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
           utxos: Array<{ outref: string; value: string }>;
         }>(`utxos?address=${address}`);
 
-        const transformedUtxos = (response?.utxos ?? [])
+        const transformed = (response?.utxos ?? [])
           .map((utxo) => this.transformMidgardUtxo(utxo))
           .filter((utxo): utxo is Cardano.Utxo => utxo !== undefined);
 
-        allUtxos.push(...transformedUtxos);
+        allUtxos.push(...transformed);
       } catch (error) {
-        this.logger.warn(`[Midgard] Request failed for address ${address}, falling back to Blockfrost:`, error);
+        this.midgardLogger.warn(`[Midgard] Request failed for address ${address}, falling back to Blockfrost:`, error);
 
         try {
           const blockfrostUtxos = await super.utxoByAddresses({ addresses: [address] });
           allUtxos.push(...blockfrostUtxos);
         } catch (blockfrostError) {
-          this.logger.error(`[Midgard] Blockfrost fallback also failed for address ${address}:`, blockfrostError);
+          this.midgardLogger.error(
+            `[Midgard] Blockfrost fallback also failed for address ${address}:`,
+            blockfrostError
+          );
           throw blockfrostError;
         }
       }
