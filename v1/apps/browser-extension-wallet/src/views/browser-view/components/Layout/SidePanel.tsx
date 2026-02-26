@@ -9,11 +9,8 @@ import styles from './SectionLayout.modules.scss';
 import { SidePanelButton } from '../SidePanelButton/SidePanelButton';
 import { CollapsiblePanelContainer } from '../CollapsiblePanelContainer/CollapsiblePanelContainer';
 import { BREAKPOINT_SMALL } from '@src/styles/constants';
-<<<<<<< HEAD:apps/browser-extension-wallet/src/views/browser-view/components/Layout/SidePanel.tsx
-import { MidgardBanner } from '@components/MidgardBanner/MidgardBanner';
-=======
 import { NotificationsBellContainer } from '@src/features/notifications-center';
->>>>>>> upstream/main:v1/apps/browser-extension-wallet/src/views/browser-view/components/Layout/SidePanel.tsx
+import { MidgardBanner } from '@components/MidgardBanner/MidgardBanner';
 
 export const CONTENT_ID = 'content';
 

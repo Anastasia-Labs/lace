@@ -26,14 +26,6 @@
   ],
   "scripts": {
     "build": "run-s cleanup:dist build:project",
-<<<<<<< HEAD:apps/browser-extension-wallet/package.json
-    "build:app": "NODE_OPTIONS='' run -T webpack --config webpack.app.${WEBPACK_ENV:-prod}.js --progress",
-    "build:dev": "WEBPACK_ENV=dev yarn build",
-    "build:firefox": "BROWSER=firefox yarn build",
-    "build:firefox:dev": "WEBPACK_ENV=dev yarn build:firefox",
-    "build:project": "run-p build:sw build:app",
-    "build:sw": "NODE_OPTIONS='' run -T webpack --config webpack.sw.${WEBPACK_ENV:-prod}.js --progress",
-=======
     "build:app": "run -T webpack --config webpack.app.${WEBPACK_ENV:-prod}.js --progress",
     "build:cs": "run -T webpack --config webpack.cs.${WEBPACK_ENV:-prod}.js --progress",
     "build:cs:dev": "run -T webpack --config webpack.cs.${WEBPACK_ENV:-dev}.js --progress",
@@ -43,7 +35,6 @@
     "build:project": "run-p build:sw build:app build:cs",
     "build:sw": "run -T webpack --config webpack.sw.${WEBPACK_ENV:-prod}.js --progress",
     "build:sw:dev": "run -T webpack --config webpack.sw.${WEBPACK_ENV:-dev}.js --progress",
->>>>>>> upstream/main:v1/apps/browser-extension-wallet/package.json
     "cleanup": "run-p cleanup:*",
     "cleanup:dist": "rm -rf dist",
     "cleanup:firefox-artifacts": "rm -rf artifacts-firefox",
@@ -57,22 +48,13 @@
     "pack:firefox": "run-s cleanup:firefox-artifacts && web-ext build --source-dir=./dist/ --filename=lace-firefox-browser-extension.zip --artifacts-dir=artifacts-firefox && unzip -o artifacts-firefox/lace-firefox-browser-extension.zip -d artifacts-firefox && rm -rf artifacts-firefox/lace-firefox-browser-extension.zip",
     "prepare": "ts-patch install -s",
     "prettier": "run -T prettier --write .",
-<<<<<<< HEAD:apps/browser-extension-wallet/package.json
-    "serve:app": "NODE_OPTIONS='' run -T webpack serve --config webpack.app.dev.js --env RUN_DEV_SERVER=true",
-=======
     "serve:app": "run -T webpack serve --config webpack.app.dev.js --env RUN_DEV_SERVER=true",
->>>>>>> upstream/main:v1/apps/browser-extension-wallet/package.json
     "test": "run -T jest --config test/jest.config.js",
     "test:e2e": "yarn exec echo \"No e2e tests on this app yet!\"",
     "type-check": "echo \"@lace/browser-extension-wallet: no type-check command specified\"",
     "watch": " run-s cleanup:dist watch:project",
-<<<<<<< HEAD:apps/browser-extension-wallet/package.json
-    "watch:app": "NODE_OPTIONS='' run -T webpack --config webpack.app.dev.js --progress --watch",
-    "watch:sw": "NODE_OPTIONS='' run -T webpack --config webpack.sw.dev.js --progress --watch",
-=======
     "watch:app": "run -T webpack --config webpack.app.dev.js --progress --watch",
     "watch:sw": "run -T webpack --config webpack.sw.dev.js --progress --watch",
->>>>>>> upstream/main:v1/apps/browser-extension-wallet/package.json
     "watch:project": "run-p watch:sw watch:app"
   },
   "dependencies": {

@@ -1,0 +1,48 @@
+.banner {
+  border-radius: 16px;
+  padding: 10px 16px;
+  margin: 4px 0 4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-color-container);
+  border: 2px solid var(--light-mode-light-grey-plus, var(--dark-mode-mid-grey));
+  transition: all 0.3s ease;
+  min-width: 200px; /* Ensure minimum width */
+  flex-shrink: 0; /* Prevent shrinking */
+  cursor: pointer; /* Show it's clickable */
+  user-select: none; /* Prevent text selection when clicking */
+}
+
+.enabled {
+  background: linear-gradient(135deg, #319647 0%, #74dd61 100%);
+  border: 2px solid #74dd61;
+  
+  .text {
+    color: #fafafa; /* Clean white text */
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Subtle depth */
+  }
+
+  :global(.ant-switch-checked) {
+    background-color: #319647 !important; /* White toggle */
+    border-color: #319647 !important;
+    
+    .ant-switch-handle::before {
+      background: #319647 !important; /* Dark green dot */
+    }
+  }
+}
+
+.disabled .text {
+  color: var(--text-color-secondary);
+}
+
+.text {
+  font-size: 16px;
+  font-weight: 500;
+  transition: color 0.3s ease;
+  margin-right: 16px;
+  flex: 1;
+  white-space: nowrap; /* Prevent text wrapping */
+}
