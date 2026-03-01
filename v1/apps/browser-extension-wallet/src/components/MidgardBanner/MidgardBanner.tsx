@@ -16,9 +16,7 @@ import styles from './MidgardBanner.module.scss';
  */
 export const MidgardBanner = (): React.ReactElement => {
   const { t } = useTranslation();
-  const { environmentName, isMidgardEnabled, setMidgardMode } = useWalletStore();
-
-  if (environmentName !== 'Preprod') return <></>;
+  const { isMidgardEnabled, setMidgardMode } = useWalletStore();
 
   const isDeposit = !isMidgardEnabled;
   const buttonText = isDeposit ? t('general.midgard.deposit') : t('general.midgard.withdraw');
