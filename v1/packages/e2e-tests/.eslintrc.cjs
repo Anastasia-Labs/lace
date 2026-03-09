@@ -11,7 +11,8 @@ module.exports = exports = {
     'wdio/no-pause': ['off'],
     '@typescript-eslint/no-explicit-any': ['off'],
     'no-unused-vars': 'off',
-    '@typescript-eslint/no-unused-vars': 'error'
+    '@typescript-eslint/no-unused-vars': 'error',
+    'import/no-unresolved': 'off'
   },
   'env': {
     'node': true

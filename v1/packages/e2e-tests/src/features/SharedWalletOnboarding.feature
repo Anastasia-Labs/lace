@@ -3,6 +3,8 @@ Feature: Shared wallet - onboarding
 
   Background:
     Given Lace is ready for test
+    And I open settings from header menu
+    And I click on "Beta Program" switch
 
   @LW-11814
   Scenario Outline: Shared wallets - Add shared wallets option <is_displayed> when using <network> network
@@ -80,8 +82,7 @@ Feature: Shared wallet - onboarding
     Then shared wallet "SW TEST 1" was loaded
     And I do not see "Staking" section in side menu
     When I open header menu
-    Then I do not see "Nami mode" switch
-    And Pencil icon is not displayed next to shared wallet
+    Then Pencil icon is not displayed next to shared wallet
 
   @LW-11822 @skip(browserName="firefox")
   #  The uploadFile command is not available in Firefox
