@@ -15,7 +15,7 @@ const getInitialMidgardState = (): boolean => {
 
 export interface MidgardSlice {
   isMidgardEnabled: boolean;
-  setMidgardMode: (enabled: boolean) => void;
+  setMidgardMode: (enabled: boolean) => Promise<void>;
 }
 
 export const midgardSlice: SliceCreator<MidgardSlice, MidgardSlice> = ({ set }) => ({

@@ -10,6 +10,8 @@ const RELOAD_DEBOUNCE_MS = 1000;
 export const useMidgardRefresh = (): void => {
   const { reloadWallet } = useWalletManager();
   const isReloading = useRef(false);
+  const reloadWalletRef = useRef(reloadWallet);
+  reloadWalletRef.current = reloadWallet;
 
   useEffect(() => {
     const handleStorageChange = async (changes: { [key: string]: { newValue?: unknown } }) => {
@@ -17,7 +19,7 @@ export const useMidgardRefresh = (): void => {
 
       isReloading.current = true;
       try {
-        await reloadWallet();
+        await reloadWalletRef.current();
       } catch (error) {
         console.error('Failed to reload wallet after Midgard setting change:', error);
       } finally {
@@ -32,5 +34,5 @@ export const useMidgardRefresh = (): void => {
     return () => {
       storage.onChanged.removeListener(handleStorageChange);
     };
-  }, [reloadWallet]);
+  }, []);
 };
