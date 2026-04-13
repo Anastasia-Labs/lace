@@ -49,6 +49,7 @@ export const AssetPortfolioContent = ({
     total: totalAssets
   });
   const { walletInfo } = useWalletStore();
+  const walletAddress = walletInfo?.addresses?.[0]?.address?.toString?.() || '';
 
   useEffect(() => {
     setCurrentAssets({
@@ -85,7 +86,7 @@ export const AssetPortfolioContent = ({
           title={t('browserView.assets.welcome')}
           subtitle={t('browserView.assets.startYourWeb3Journey')}
           prompt={t('browserView.fundWalletBanner.prompt')}
-          walletAddress={walletInfo.addresses[0].address.toString()}
+          walletAddress={walletAddress}
         />
       )}
       {

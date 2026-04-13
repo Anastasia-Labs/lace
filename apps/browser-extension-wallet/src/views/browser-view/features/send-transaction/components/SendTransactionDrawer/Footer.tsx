@@ -37,13 +37,16 @@ import { AddressBookSchema } from '@lib/storage';
 import { getAddressToSave } from '@src/utils/validators';
 import { useAnalyticsContext } from '@providers';
 import { txSubmitted$ } from '@providers/AnalyticsProvider/onChain';
-import { withSignTxConfirmation } from '@lib/wallet-api-ui';
+import { midgardSigningCoordinator, withSignMidgardTxConfirmation, withSignTxConfirmation } from '@lib/wallet-api-ui';
 import type { TranslationKey } from '@lace/translation';
 import { Serialization } from '@cardano-sdk/core';
 import { exportMultisigTransaction, PasswordObj, useSecrets, useSignPolicy } from '@lace/core';
 import { parseError } from '@src/utils/parse-error';
 import { getParentWalletForCIP1854Account } from '@lib/scripts/background/util';
 import { WalletType } from '@cardano-sdk/web-extension';
+import { getMidgardSendBlockReason } from '@src/stores/slices/midgard-slice';
+import { getMidgardUrl } from '@src/utils/midgard-url';
+import { submitMidgardTx } from '@src/utils/midgard-submit';
 
 export const nextStepBtnLabels: Partial<Record<Sections, TranslationKey>> = {
   [Sections.FORM]: 'browserView.transaction.send.footer.review',
@@ -60,6 +63,32 @@ export const nextStepBtnLabels: Partial<Record<Sections, TranslationKey>> = {
 const hasTempTxData = () => {
   const { tempOutputs, tempAddress } = getTemporaryTxDataFromStorage();
   return tempOutputs !== null || tempAddress !== null;
+};
+
+class MidgardBackendError extends Error {
+  cause?: unknown;
+
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    this.name = 'MidgardBackendError';
+    this.cause = cause;
+  }
+}
+
+const MIDGARD_CONNECTIVITY_ERROR_PATTERNS = [
+  /^HTTP \d+$/i,
+  /failed to fetch/i,
+  /load failed/i,
+  /network(?:\s+request)?\s+failed/i,
+  /network\s*error/i,
+  /timed?\s*out/i
+];
+
+const shouldDegradeMidgardHealth = (error: unknown): boolean => {
+  if (error instanceof MidgardBackendError) return true;
+
+  const { message } = parseError(error);
+  return MIDGARD_CONNECTIVITY_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 };
 
 interface FooterProps {
@@ -79,7 +108,24 @@ export const Footer = withAddressBookContext(
     const { builtTxData, setBuiltTxData } = useBuiltTxState();
     const { setSection, currentSection } = useSections();
     const { setSubmitingTxState, isSubmitingTx, isPasswordValid } = useSubmitingState();
-    const { inMemoryWallet, isInMemoryWallet, walletType, isSharedWallet, currentChain } = useWalletStore();
+    const {
+      blockchainProvider: { inputResolver },
+      cardanoWallet,
+      inMemoryWallet,
+      isInMemoryWallet,
+      walletType,
+      isSharedWallet,
+      currentChain,
+      environmentName,
+      walletInfo,
+      isMidgardEnabled,
+      midgardActivationStatus,
+      midgardHealthStatus,
+      midgardHealthError,
+      setMidgardHealthDegraded,
+      addMidgardPendingActivity,
+      walletState
+    } = useWalletStore();
     const { password, clearSecrets: removePassword } = useSecrets();
     const [metadata] = useMetadata();
     const { onClose, onCloseSubmitedTransaction } = useHandleClose();
@@ -101,6 +147,21 @@ export const Footer = withAddressBookContext(
     const policy = useSignPolicy(wallet, 'payment');
 
     const isSummaryStep = currentSection.currentSection === Sections.SUMMARY;
+    const isMidgardSwitching = midgardActivationStatus === 'switching';
+    const midgardSendBlockReason = getMidgardSendBlockReason({
+      isMidgardEnabled,
+      midgardActivationStatus,
+      midgardHealthStatus,
+      isInMemoryWallet,
+      isSharedWallet
+    });
+    const isMidgardUnavailable = !!midgardSendBlockReason;
+    const activeAddress = walletInfo?.addresses?.[0]?.address?.toString() || '';
+    const midgardUnavailableMessage =
+      midgardSendBlockReason &&
+      (midgardActivationStatus === 'switching' || midgardHealthStatus === 'degraded'
+        ? `${midgardSendBlockReason}${midgardHealthError ? ` ${midgardHealthError}` : ''}`
+        : midgardSendBlockReason);
 
     const sendEventToPostHog = (evtAction: PostHogAction) =>
       analytics.sendEventToPostHog(evtAction, {
@@ -194,7 +255,138 @@ export const Footer = withAddressBookContext(
     const isParentWalletInMemoryWallet = parentWalletType === WalletType.InMemory;
     const isHwSummary = isSummaryStep && !isInMemoryWallet && !isParentWalletInMemoryWallet;
 
+    const submitMidgardTransaction = useCallback(
+      async ({
+        cardanoPreviewCbor,
+        cardanoTxId,
+        expectedTxId,
+        signedTxCbor
+      }: {
+        cardanoPreviewCbor?: string;
+        cardanoTxId?: string;
+        expectedTxId: string;
+        signedTxCbor: string;
+      }) => {
+        const midgardUrl = await getMidgardUrl(environmentName);
+        if (!midgardUrl) {
+          throw new Error(`Midgard send is not configured for ${environmentName ?? 'the active chain'}`);
+        }
+
+        let txId: string;
+        try {
+          txId = await submitMidgardTx({
+            expectedTxId,
+            signedTxCbor,
+            midgardUrl
+          });
+        } catch (error) {
+          throw new MidgardBackendError(parseError(error).message, error);
+        }
+
+        if (activeAddress) {
+          addMidgardPendingActivity({
+            ...(cardanoPreviewCbor && { cardanoPreviewCbor }),
+            txId,
+            ...(cardanoTxId && { cardanoTxId }),
+            nativeTxCbor: signedTxCbor,
+            address: activeAddress,
+            createdAt: new Date().toISOString(),
+            kind: 'send',
+            schemaVersion: 2,
+            txFormat: 'midgard-native'
+          });
+        }
+
+        return txId;
+      },
+      [activeAddress, addMidgardPendingActivity, environmentName]
+    );
+
+    const prepareMidgardNativeTransaction = useCallback(async () => {
+      if (!isMidgardEnabled) {
+        throw new Error('Unexpected Midgard native signing request while Midgard mode is disabled');
+      }
+      if (isSharedWallet) {
+        throw new Error('Midgard native signing does not support shared wallets in phase 1');
+      }
+      if (!isInMemoryWallet || wallet?.type !== WalletType.InMemory) {
+        throw new Error('Midgard native signing currently supports in-memory wallets only');
+      }
+      if (!walletState) {
+        throw new Error('Wallet state is not ready for Midgard signing');
+      }
+      if (!currentChain) {
+        throw new Error('Active chain metadata is not available for Midgard signing');
+      }
+      if (!cardanoWallet?.source.account) {
+        throw new Error('Active account metadata is not available for Midgard signing');
+      }
+      if (!builtTxData.tx) {
+        throw new Error('Transaction review data is not available');
+      }
+
+      const { auxiliaryData, body } = await builtTxData.tx.inspect();
+      const draft = Wallet.createMidgardNativeTxDraft({ auxiliaryData, body });
+      const groupedAddresses = walletState.addresses.filter(
+        (address): address is Wallet.KeyManagement.GroupedAddress => Wallet.isKeyHashAddress(address)
+      );
+      if (groupedAddresses.length !== walletState.addresses.length) {
+        throw new Error('Midgard native signing requires grouped wallet addresses');
+      }
+
+      const txInKeyPathMap = await Wallet.KeyManagement.util.createTxInKeyPathMap(body, groupedAddresses, inputResolver);
+      const derivationPaths = Wallet.KeyManagement.util.ownSignatureKeyPaths(
+        body,
+        groupedAddresses,
+        txInKeyPathMap,
+        undefined,
+        undefined
+      );
+      if (derivationPaths.length === 0) {
+        throw new Error('No signing keys were derived for the Midgard transaction');
+      }
+
+      return {
+        cardanoTxId: Serialization.TxCBOR.deserialize(draft.cardanoPreviewCbor).id.toString(),
+        derivationPaths,
+        draft,
+        requestContext: {
+          accountIndex: cardanoWallet.source.account.accountIndex,
+          chainId: currentChain,
+          wallet
+        }
+      };
+    }, [builtTxData.tx, cardanoWallet?.source.account, currentChain, inputResolver, isInMemoryWallet, isMidgardEnabled, isSharedWallet, wallet, walletState]);
+
+    const signAndSubmitPreparedMidgardTransaction = useCallback(
+      async ({
+        cardanoTxId,
+        derivationPaths,
+        draft,
+        requestContext
+      }: Awaited<ReturnType<typeof prepareMidgardNativeTransaction>>) => {
+        const witnesses = await midgardSigningCoordinator.signTransaction({
+          derivationPaths,
+          requestContext,
+          signingHash: draft.signingHash
+        });
+        const signed = Wallet.assembleMidgardSignedTx(draft, witnesses);
+
+        await submitMidgardTransaction({
+          cardanoPreviewCbor: draft.cardanoPreviewCbor,
+          cardanoTxId,
+          expectedTxId: signed.txId.toString(),
+          signedTxCbor: signed.cbor
+        });
+      },
+      [submitMidgardTransaction]
+    );
+
     const signAndSubmitTransaction = useCallback(async () => {
+      if (isMidgardEnabled) {
+        throw new Error('Unexpected Cardano signing path while Midgard mode is enabled');
+      }
+
       if (isSharedWallet) {
         let sharedWalletTx: Serialization.Transaction;
         try {
@@ -228,7 +420,8 @@ export const Footer = withAddressBookContext(
 
         if (collectedEnoughSharedWalletTxSignatures) {
           try {
-            await inMemoryWallet.submitTx(sharedWalletTx.toCbor());
+            const sharedWalletTxCbor = sharedWalletTx.toCbor();
+            await inMemoryWallet.submitTx(sharedWalletTxCbor);
           } catch (error) {
             logger.error('Shared wallet TX submit error', error);
             setBuiltTxData({
@@ -270,6 +463,7 @@ export const Footer = withAddressBookContext(
       builtTxData,
       currentChain,
       inMemoryWallet,
+      isMidgardEnabled,
       isSharedWallet,
       policy?.requiredCosigners,
       setBuiltTxData,
@@ -282,7 +476,15 @@ export const Footer = withAddressBookContext(
         setSubmitingTxState({ isPasswordValid: true, isSubmitingTx: true });
 
         try {
-          await withSignTxConfirmation(signAndSubmitTransaction, passphrase.value);
+          if (isMidgardEnabled) {
+            const preparedMidgardTransaction = await prepareMidgardNativeTransaction();
+            await withSignMidgardTxConfirmation(
+              () => signAndSubmitPreparedMidgardTransaction(preparedMidgardTransaction),
+              passphrase.value
+            );
+          } else {
+            await withSignTxConfirmation(signAndSubmitTransaction, passphrase.value);
+          }
           // Send amount of bundles as value
           setSection({ currentSection: Sections.SUCCESS_TX });
           setSubmitingTxState({ isPasswordValid: true, isSubmitingTx: false });
@@ -295,6 +497,15 @@ export const Footer = withAddressBookContext(
               setSubmitingTxState({ isPasswordValid: false, isSubmitingTx: false });
             }
           } else {
+            const parsedError = parseError(error);
+            logger.error(isMidgardEnabled ? 'Midgard send flow error' : 'TX submit error', error);
+            if (isMidgardEnabled && shouldDegradeMidgardHealth(parsedError)) {
+              setMidgardHealthDegraded(parsedError.message);
+            }
+            setBuiltTxData({
+              ...builtTxData,
+              error: parsedError
+            });
             setSection({ currentSection: Sections.FAIL_TX });
             setSubmitingTxState({ isSubmitingTx: false });
           }
@@ -302,7 +513,20 @@ export const Footer = withAddressBookContext(
           removePassword();
         }
       },
-      [isSubmitingTx, removePassword, setSection, setSubmitingTxState, signAndSubmitTransaction, isHwSummary]
+      [
+        builtTxData,
+        isHwSummary,
+        isMidgardEnabled,
+        isSubmitingTx,
+        prepareMidgardNativeTransaction,
+        removePassword,
+        setBuiltTxData,
+        setMidgardHealthDegraded,
+        setSection,
+        setSubmitingTxState,
+        signAndSubmitPreparedMidgardTransaction,
+        signAndSubmitTransaction
+      ]
     );
 
     useEffect(() => {
@@ -411,8 +635,9 @@ export const Footer = withAddressBookContext(
     const confirmDisable = useMemo(
       () =>
         (!builtTxData.importedSharedWalletTx && (!builtTxData.tx || hasInvalidOutputs)) ||
-        metadata?.length > METADATA_MAX_LENGTH,
-      [builtTxData.importedSharedWalletTx, builtTxData.tx, hasInvalidOutputs, metadata?.length]
+        metadata?.length > METADATA_MAX_LENGTH ||
+        isMidgardUnavailable,
+      [builtTxData.importedSharedWalletTx, builtTxData.tx, hasInvalidOutputs, isMidgardUnavailable, metadata?.length]
     );
 
     const isSubmitDisabled = useMemo(
@@ -436,13 +661,24 @@ export const Footer = withAddressBookContext(
         return t('general.button.view-co-signers');
       }
 
+      if (isMidgardSwitching && currentSection.currentSection === Sections.FORM) {
+        return 'Switching wallet providers...';
+      }
+
+      if (isMidgardUnavailable && currentSection.currentSection === Sections.FORM) {
+        return isMidgardEnabled ? 'Midgard send unavailable' : 'Midgard unavailable';
+      }
+
       return t(nextStepBtnLabels[currentSection.currentSection]);
     }, [
       isHwSummary,
       isSharedWallet,
-      currentSection.currentSection,
-      t,
-      isPopupView,
+        isMidgardSwitching,
+        isMidgardUnavailable,
+        isMidgardEnabled,
+        currentSection.currentSection,
+        t,
+        isPopupView,
       parentWalletType,
       walletType,
       isSubmitingTx
@@ -516,6 +752,11 @@ export const Footer = withAddressBookContext(
           >
             {cancelButtonLabel}
           </Button>
+          {isMidgardUnavailable && (
+            <div className={styles.statusHint} data-testid="midgard-send-switching-hint">
+              {midgardUnavailableMessage}
+            </div>
+          )}
         </div>
         <AddressActionsModal
           action={action}

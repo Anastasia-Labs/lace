@@ -4,8 +4,18 @@ import type { Cache } from '@cardano-sdk/util';
 import { Cardano, Serialization } from '@cardano-sdk/core';
 import { MidgardClient } from './client';
 
+type MidgardUtxoResponse = { outref: string; value: string };
+
+class MidgardUtxoDecodeError extends Error {
+  constructor(address: string, utxo: MidgardUtxoResponse, cause: unknown) {
+    super(`Midgard returned a malformed UTxO for ${address} (outref=${utxo.outref})`);
+    this.name = 'MidgardUtxoDecodeError';
+    this.cause = cause;
+  }
+}
+
 /**
- * MidgardUtxoProvider - Uses Midgard client only (no Blockfrost fallback)
+ * MidgardUtxoProvider - fetches UTxOs from Midgard only.
  */
 export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
   private readonly midgardClient: MidgardClient;
@@ -25,13 +35,10 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
   /**
    * Transform Midgard UTxO data to Cardano SDK format using CBOR decoding
    */
-  private transformMidgardUtxo(midgardUtxo: {
-    outref: string;
-    value: string;
-  }): Cardano.Utxo | undefined {
+  private transformMidgardUtxo(address: string, midgardUtxo: MidgardUtxoResponse): Cardano.Utxo {
     try {
-      const outrefBuffer = Buffer.from(midgardUtxo.outref, 'hex')
-      const valueBuffer = Buffer.from(midgardUtxo.value, 'hex')
+      const outrefBuffer = Buffer.from(midgardUtxo.outref, 'hex');
+      const valueBuffer = Buffer.from(midgardUtxo.value, 'hex');
 
       const txInput = Serialization.TransactionInput.fromCbor(outrefBuffer);
       const txOutput = Serialization.TransactionOutput.fromCbor(valueBuffer);
@@ -47,30 +54,33 @@ export class MidgardUtxoProvider extends BlockfrostUtxoProvider {
         value: txOutput.toCore().value
       };
 
-      return [txIn, txOut] as Cardano.Utxo | undefined;
+      return [txIn, txOut] as Cardano.Utxo;
     } catch (error) {
-      this.logger.error('[Midgard] Failed to transform UTxO:', midgardUtxo, error);
-      return undefined as Cardano.Utxo | undefined;
+      const decodeError = new MidgardUtxoDecodeError(address, midgardUtxo, error);
+      this.logger.error('[Midgard] Failed to decode UTxO from Midgard', decodeError);
+      throw decodeError;
     }
   }
 
   /**
-   * Fetch UTxOs from Midgard
+   * Fetch UTxOs from Midgard only. Midgard mode should never silently show L1 data.
    */
-async utxoByAddresses({ addresses }: { addresses: string[] }): Promise<Cardano.Utxo[]> {
-  const allUtxosArrays = await Promise.all(
-    addresses.map(async (address) => {
-      const response = await this.midgardClient.request<{
-        utxos: Array<{ outref: string; value: string }>;
-      }>(`utxos?address=${address}`);
+  async utxoByAddresses({ addresses }: { addresses: string[] }): Promise<Cardano.Utxo[]> {
+    try {
+      const allUtxosArrays = await Promise.all(
+        addresses.map(async (address) => {
+          const response = await this.midgardClient.request<{
+            utxos: MidgardUtxoResponse[];
+          }>(`utxos?address=${encodeURIComponent(address)}`);
 
-      const transformedUtxos = (response?.utxos ?? [])
-        .map((utxo) => this.transformMidgardUtxo(utxo))
-        .filter((utxo): utxo is Cardano.Utxo => utxo !== undefined);
+          return (response?.utxos ?? []).map((utxo) => this.transformMidgardUtxo(address, utxo));
+        })
+      );
 
-      return transformedUtxos;
-    })
-  );
-
-  return allUtxosArrays.flat();
-}};
+      return allUtxosArrays.flat();
+    } catch (error) {
+      this.logger.error('[Midgard] Failed to fetch UTxOs from Midgard', error);
+      throw error;
+    }
+  }
+}

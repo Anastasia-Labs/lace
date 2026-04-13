@@ -13,7 +13,7 @@ export interface AssetSortBy {
   sortBy: {
     fiatBalance?: number;
     metadataName?: string;
-    fingerprint: Wallet.Cardano.AssetFingerprint;
+    fingerprint?: Wallet.Cardano.AssetFingerprint | string;
     amount?: string;
   };
 }

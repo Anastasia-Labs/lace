@@ -58,19 +58,27 @@ export const SidePanel = ({ sidePanelContent, isSidePanelFixed = true }: Section
     setIsPanelVisible((prev) => !prev);
   };
 
-  const topNavigation = (
+  const navigationControls = (
     <div
       className={classnames(styles.navigationBox, {
         [styles.navigationBoxOverlay]: isPanelVisible && isScreenTooSmallForSidePanel,
         [styles.navigationBoxFlexible]: process.env.USE_MULTI_WALLET === 'true'
       })}
     >
-      <MidgardBanner />
       <TransactionCTAsBox />
       <DropdownMenu />
       {!!sidePanelContent && isScreenTooSmallForSidePanel && (
         <SidePanelButton active={isPanelVisible} onClick={toggleSidePanelVisibility} />
       )}
+    </div>
+  );
+
+  const topNavigation = (
+    <div className={styles.topNavigationStack}>
+      <div className={styles.midgardNavigation}>
+        <MidgardBanner />
+      </div>
+      {navigationControls}
     </div>
   );
 

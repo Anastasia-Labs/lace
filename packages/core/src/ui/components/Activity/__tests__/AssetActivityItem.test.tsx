@@ -99,5 +99,12 @@ describe('Testing AssetActivityItem component', () => {
     expect(props.onClick).toHaveBeenCalled();
   });
 
+  test('should prefer a custom label when provided', async () => {
+    const { findByTestId } = render(<AssetActivityItem {...props} label="Midgard L2 Deposit" />);
+    const transactionType = await findByTestId('transaction-type');
+
+    expect(transactionType).toHaveTextContent('Midgard L2 Deposit');
+  });
+
   test.todo('AssetActivityItem > test customIcon/type behaviour');
 });

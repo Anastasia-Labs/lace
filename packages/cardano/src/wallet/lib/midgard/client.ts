@@ -27,13 +27,19 @@ export class MidgardClient {
     this.logger = logger;
   }
 
+  private buildUrl(endpoint: string): string {
+    const normalizedBaseUrl = this.config.baseUrl.replace(/\/+$/, '');
+    const normalizedEndpoint = endpoint.replace(/^\/+/, '');
+    return `${normalizedBaseUrl}/${normalizedEndpoint}`;
+  }
+
   /**
    * Makes a request to the Midgard API
    * @param endpoint - The API endpoint (e.g., 'utxos/{address}')
    * @returns Promise with the response data
    */
   async request<T>(endpoint: string): Promise<T> {
-    const url = `${this.config.baseUrl}/${endpoint}`;
+    const url = this.buildUrl(endpoint);
 
     this.logger.debug(`Making Midgard request to: ${url}`);
 
@@ -67,8 +73,8 @@ export class MidgardClient {
    * @param data - The data to send
    * @returns Promise with the response data
    */
-  async post<T>(endpoint: string, data: Record<string, unknown>): Promise<T> {
-    const url = `${this.config.baseUrl}/${endpoint}`;
+  async post<T>(endpoint: string, data: unknown): Promise<T> {
+    const url = this.buildUrl(endpoint);
 
     this.logger.debug(`Making Midgard POST request to: ${url}`);
 

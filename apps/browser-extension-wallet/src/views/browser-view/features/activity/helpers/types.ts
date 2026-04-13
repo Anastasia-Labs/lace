@@ -3,6 +3,7 @@ import { TxDirection } from '@src/types';
 
 export type TransformedActivity = {
   id?: string;
+  label?: string;
   fee?: string;
   deposit?: string; // e.g. stake registrations
   depositReclaim?: string; // e.g. stake de-registrations

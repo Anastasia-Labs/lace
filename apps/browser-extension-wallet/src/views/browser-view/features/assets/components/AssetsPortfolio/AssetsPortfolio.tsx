@@ -9,6 +9,7 @@ import { compactNumberWithUnit } from '@src/utils/format-number';
 import { PortfolioBalance, TopUpWalletButton } from '@src/views/browser-view/components';
 import { useCurrencyStore } from '@providers/currency';
 import { useWalletStore } from '@src/stores';
+import { getMidgardSendBlockReason } from '@src/stores/slices/midgard-slice';
 import { useFetchCoinPrice } from '@hooks/useFetchCoinPrice';
 import { useRedirection } from '@hooks/useRedirection';
 import { walletRoutePaths } from '@routes/wallet-paths';
@@ -56,7 +57,12 @@ export const AssetsPortfolio = ({
   const { t } = useTranslation();
   const {
     walletUI: { canManageBalancesVisibility, areBalancesVisible },
-    currentChain
+    currentChain,
+    isInMemoryWallet,
+    isMidgardEnabled,
+    midgardActivationStatus,
+    midgardHealthStatus,
+    isSharedWallet
   } = useWalletStore();
   const { fiatCurrency } = useCurrencyStore();
   const redirectToReceive = useRedirection(walletRoutePaths.receive);
@@ -65,6 +71,13 @@ export const AssetsPortfolio = ({
 
   const isPopupView = appMode === APP_MODE_POPUP;
   const isMainnet = currentChain?.networkMagic === Wallet.Cardano.NetworkMagics.Mainnet;
+  const isSendDisabled = !!getMidgardSendBlockReason({
+    isMidgardEnabled,
+    midgardActivationStatus,
+    midgardHealthStatus,
+    isInMemoryWallet,
+    isSharedWallet
+  });
 
   const portfolioBalanceAsBigNumber = useMemo(() => new BigNumber(portfolioTotalBalance), [portfolioTotalBalance]);
   const isPortfolioBalanceLoading = useMemo(
@@ -78,6 +91,8 @@ export const AssetsPortfolio = ({
   };
 
   const openSend = () => {
+    if (isSendDisabled) return;
+
     // eslint-disable-next-line camelcase
     analytics.sendEventToPostHog(PostHogAction.SendClick, { trigger_point: SendFlowTriggerPoints.SEND_BUTTON });
     redirectToSend({ params: { id: '1' } });
@@ -119,6 +134,7 @@ export const AssetsPortfolio = ({
           onReceiveClick={handleRedirectToReceive}
           popupView
           buttonClassName={styles.testPopupClass}
+          isSendDisabled={isSendDisabled}
         />
       )}
       {!isPopupView && isScreenTooSmallForSidePanel && USE_FOOR_TOPUP && isMainnet && (

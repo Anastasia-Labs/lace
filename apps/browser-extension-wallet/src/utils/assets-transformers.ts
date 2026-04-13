@@ -56,7 +56,7 @@ export const parseFiat = (value: number): string => {
 
 // eslint-disable-next-line complexity
 export const assetTransformer = (params: {
-  token: Wallet.Asset.AssetInfo;
+  token?: Wallet.Asset.AssetInfo;
   key: Wallet.Cardano.AssetId;
   total?: Wallet.Cardano.Value;
   fiat?: number;
@@ -75,7 +75,9 @@ export const assetTransformer = (params: {
     areBalancesVisible = true,
     balancesPlaceholder = ''
   } = params;
-  const { tokenMetadata, fingerprint, policyId } = token;
+  const tokenMetadata = token?.tokenMetadata;
+  const fingerprint = token?.fingerprint;
+  const policyId = token?.policyId;
 
   const bigintBalance = total?.assets?.get(key) || BigInt(1);
   const tokenBalance = Wallet.util.calculateAssetBalance(bigintBalance, token);
@@ -92,7 +94,13 @@ export const assetTransformer = (params: {
   const formattedFiatBalance =
     fiatBalance !== undefined ? `${parseFiat(fiatBalance.toNumber())} ${fiatCurrency.code}` : '-';
 
-  const displayMetadata = getTokenDisplayMetadata(token);
+  const displayMetadata: ReturnType<typeof getTokenDisplayMetadata> = token
+    ? getTokenDisplayMetadata(token)
+    : {
+        name: key.toString(),
+        description: '-',
+        logo: getRandomIcon({ id: key.toString(), size: 30 })
+      };
 
   return {
     id: key.toString(),
@@ -109,7 +117,7 @@ export const assetTransformer = (params: {
     sortBy: {
       fiatBalance: fiatBalance?.toNumber(),
       metadataName: tokenMetadata?.name,
-      fingerprint,
+      fingerprint: fingerprint?.toString(),
       amount: tokenBalance
     }
   };

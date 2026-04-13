@@ -113,6 +113,7 @@ export type BackgroundService = {
   backendFailures$: BehaviorSubject<number>;
   unhandledError$: Observable<UnhandledError>;
   reloadWallet: () => Promise<void>;
+  setMidgardModeAndReload: (enabled: boolean) => Promise<{ effectiveEnabled: boolean }>;
 };
 
 export type WalletMode = {

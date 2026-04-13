@@ -7,6 +7,8 @@ import { Sections } from './types';
 import { HeaderTitle } from './components/SendTransactionDrawer/HeaderView';
 import styles from './useOpenTransactionDrawer.module.scss';
 import { useDrawer } from '@views/browser/stores';
+import { useWalletStore } from '@src/stores';
+import { getMidgardSendBlockReason } from '@src/stores/slices/midgard-slice';
 
 const FIRST_ROW = 'output1';
 
@@ -22,6 +24,8 @@ export const useOpenTransactionDrawer = ({
   config
 }: UseTransactionDrawerConfigParams = {}): (() => void) => {
   const [, setDrawerConfig] = useDrawer();
+  const { isInMemoryWallet, isSharedWallet, isMidgardEnabled, midgardActivationStatus, midgardHealthStatus } =
+    useWalletStore();
   const { onClose } = useHandleClose();
   const [row] = useCurrentRow();
   const { setAddressValue } = useAddressState(row || FIRST_ROW);
@@ -36,8 +40,21 @@ export const useOpenTransactionDrawer = ({
   const shouldRenderFooter =
     ![Sections.ADDRESS_LIST, Sections.ADDRESS_FORM, Sections.ASSET_PICKER].includes(currentSection) ||
     shouldAssetPickerDisplayFooter;
+  const isSendBlocked =
+    content === DrawerContent.SEND_TRANSACTION &&
+    !!getMidgardSendBlockReason({
+      isMidgardEnabled,
+      midgardActivationStatus,
+      midgardHealthStatus,
+      isInMemoryWallet,
+      isSharedWallet
+    });
 
   return useCallback(() => {
+    if (isSendBlocked) {
+      return;
+    }
+
     setDrawerConfig({
       content,
       wrapperClassName: styles.drawer,
@@ -70,6 +87,7 @@ export const useOpenTransactionDrawer = ({
     setAddressValue,
     setDrawerConfig,
     setSection,
-    shouldRenderFooter
+    shouldRenderFooter,
+    isSendBlocked
   ]);
 };

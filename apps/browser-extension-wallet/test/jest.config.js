@@ -9,6 +9,7 @@ module.exports = createJestConfig({
     '^[.]*(?!.*\\.component\\.svg$).*\\.svg*$': '<rootDir>/test/__mocks__/fileMock.js',
     'component\\.svg(\\?v=\\d+\\.d+\\.\\d+)?$': '<rootDir>/test/__mocks__/svgMock.js',
     '^lodash-es$': 'lodash',
+    '^usb$': '<rootDir>/test/__mocks__/usb.js',
     // https://github.com/LedgerHQ/ledger-live/issues/763
     '@ledgerhq/devices/hid-framing': '@ledgerhq/devices/lib/hid-framing',
     // TODO update uuid and retest; https://github.com/uuidjs/uuid/issues/451

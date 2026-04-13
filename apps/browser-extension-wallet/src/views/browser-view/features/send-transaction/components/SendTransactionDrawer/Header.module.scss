@@ -6,6 +6,11 @@
   align-items: center;
   justify-content: space-between;
   padding-bottom: size_unit(5.5);
+
+  @media (max-height: 820px) {
+    padding-bottom: size_unit(3);
+  }
+
   :global(.ant-btn-icon-only) {
     width: size_unit(5);
     height: size_unit(5);

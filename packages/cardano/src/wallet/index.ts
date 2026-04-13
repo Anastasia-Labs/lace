@@ -87,6 +87,10 @@ export * from './lib/providers';
 export * from '@wallet/lib/config';
 export * from '@wallet/lib/blockfrost-input-resolver';
 export * from '@wallet/lib/blockfrost-address-discovery';
+export * from '@wallet/lib/midgard/l1-activity';
+export * from '@wallet/lib/midgard/native-history-decoder';
+export * from '@wallet/lib/midgard/native-signing';
+export * from '@wallet/lib/midgard/provenance';
 
 export * as mockUtils from '@wallet/test/mocks';
 export * from '@wallet/types';

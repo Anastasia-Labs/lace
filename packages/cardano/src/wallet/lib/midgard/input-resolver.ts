@@ -1,7 +1,10 @@
-/* eslint-disable unicorn/no-null, @typescript-eslint/no-non-null-assertion */
-import { Cardano } from '@cardano-sdk/core';
+/* eslint-disable unicorn/no-null */
+import { Cardano, Serialization } from '@cardano-sdk/core';
 import type { Cache } from '@cardano-sdk/util';
 import { Logger } from 'ts-log';
+import { MidgardClient, MidgardError } from './client';
+
+const MIDGARD_NOT_FOUND_STATUS = 404;
 
 /**
  * Converts a Cardano.TxIn object to a unique UTXO ID.
@@ -19,10 +22,20 @@ const txInToId = (txIn: Cardano.TxIn): string => `${txIn.txId}#${txIn.index}`;
 export class MidgardInputResolver implements Cardano.InputResolver {
   readonly #logger: Logger;
   readonly #txCache: Cache<Cardano.TxOut>;
+  readonly #midgardClient: MidgardClient;
 
-  constructor({ cache, logger }: { cache: Cache<Cardano.TxOut>; logger: Logger }) {
+  constructor({
+    cache,
+    logger,
+    midgardClient
+  }: {
+    cache: Cache<Cardano.TxOut>;
+    logger: Logger;
+    midgardClient: MidgardClient;
+  }) {
     this.#txCache = cache;
     this.#logger = logger;
+    this.#midgardClient = midgardClient;
   }
 
   /**
@@ -57,15 +70,18 @@ export class MidgardInputResolver implements Cardano.InputResolver {
    * @private
    */
   private resolveFromHints(input: Cardano.TxIn, options?: Cardano.ResolveOptions): Cardano.TxOut | null {
-    if (!options?.hints?.transactions) return null;
+    if (options?.hints?.transactions) {
+      const tx = options.hints.transactions.find((t) => t.id === input.txId);
+      if (tx) {
+        const output = tx.body.outputs[input.index];
+        if (output) return output;
+      }
+    }
 
-    const tx = options.hints.transactions.find((t) => t.id === input.txId);
-    if (!tx) return null;
+    if (!options?.hints?.utxos) return null;
 
-    const output = tx.body.outputs[input.index];
-    if (!output) return null;
-
-    return output;
+    const utxo = options.hints.utxos.find(([txIn]) => txIn.txId === input.txId && txIn.index === input.index);
+    return utxo ? utxo[1] : null;
   }
 
   /**
@@ -75,16 +91,28 @@ export class MidgardInputResolver implements Cardano.InputResolver {
    */
   private async fetchAndCacheTxOut(input: Cardano.TxIn): Promise<Cardano.TxOut | null> {
     try {
-      // For now, we'll use a placeholder implementation
-      // In a real implementation, you would make a request to Midgard API
-      // to fetch the transaction output for the given input
-      this.#logger.debug(`Fetching transaction output for ${input.txId}#${input.index} from Midgard`);
+      this.#logger.debug(`Fetching UTxO ${input.txId}#${input.index} from Midgard`);
+      const response = await this.#midgardClient.post<{
+        utxos?: Array<{ outref: string; value: string }>;
+      }>('utxos?by-outrefs', [`${input.txId}#${input.index}`]);
+      const encodedTxOut = response?.utxos?.[0]?.value;
+      if (typeof encodedTxOut !== 'string') return null;
 
-      // Placeholder: return null for now
-      // TODO: Implement actual Midgard API call to fetch transaction output
-      return null;
+      const txOut = Serialization.TransactionOutput.fromCbor(Buffer.from(encodedTxOut, 'hex')).toCore();
+      if (!txOut) {
+        this.#logger.warn(`Midgard UTxO ${input.txId}#${input.index} could not be decoded`);
+        return null;
+      }
+
+      await this.#txCache.set(txInToId(input), txOut);
+      return txOut;
     } catch (error) {
-      this.#logger.error(`Failed to fetch transaction output for ${input.txId}#${input.index}:`, error);
+      if (error instanceof MidgardError && error.status === MIDGARD_NOT_FOUND_STATUS) {
+        this.#logger.warn(`Midgard UTxO ${input.txId}#${input.index} was not found during input resolution`);
+        return null;
+      }
+
+      this.#logger.error(`Failed to fetch UTxO ${input.txId}#${input.index} from Midgard:`, error);
       return null;
     }
   }

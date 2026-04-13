@@ -34,10 +34,10 @@ import { MidnightEventBanner } from './MidnightEventBanner';
 import { useCurrentBlockchain } from '@src/multichain';
 import { getNetworkName } from '@src/utils/get-network-name';
 import { Wallet } from '@lace/cardano';
+import { getMidgardSendBlockReason } from '@src/stores/slices/midgard-slice';
 
 const LIST_ITEM_HEIGHT = 80;
 const SEND_COIN_OUTPUT_ID = 'output1';
-const ASSETS_OTHER_THAN_ADA = 2;
 
 interface AssetsProps {
   topSection?: React.ReactNode;
@@ -59,7 +59,11 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
     resetActivityState,
     blockchainProvider,
     environmentName,
-    setMidgardMode // Add this line
+    isInMemoryWallet,
+    isSharedWallet,
+    isMidgardEnabled,
+    midgardActivationStatus,
+    midgardHealthStatus
   } = useWalletStore();
   const popupView = appMode === APP_MODE_POPUP;
   const hiddenBalancePlaceholder = getHiddenBalancePlaceholder();
@@ -68,23 +72,19 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
   const isScreenTooSmallForSidePanel = useIsSmallerScreenWidthThan(BREAKPOINT_SMALL);
   const { blockchain } = useCurrentBlockchain();
   const isMainnet = getNetworkName(blockchain, environmentName) === 'Mainnet';
+  const midgardSendBlockReason = getMidgardSendBlockReason({
+    isMidgardEnabled,
+    midgardActivationStatus,
+    midgardHealthStatus,
+    isInMemoryWallet,
+    isSharedWallet
+  });
 
   const [isActivityDetailsOpen, setIsActivityDetailsOpen] = useState(false);
   const [fullAssetList, setFullAssetList] = useState<AssetTableProps['rows']>();
   const pageSize = useItemsPageSize(LIST_ITEM_HEIGHT);
   const [listItemsAmount, setListItemsAmount] = useState(pageSize);
   const [selectedAssetId, setSelectedAssetId] = useState<string | undefined>();
-
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'midgardEnabled' && e.newValue !== null) {
-        setMidgardMode(JSON.parse(e.newValue)); // Use the hook directly
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [setMidgardMode]); // Add setMidgardMode to dependencies
 
   useEffect(() => {
     setListItemsAmount(pageSize);
@@ -100,8 +100,8 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
   const lovelaceRewards = useObservable(inMemoryWallet.balance.rewardAccounts.rewards$);
   // Wallet's coin balance from UTxOs + available rewards in lovelace (without assets)
   const lovelaceBalanceWithRewards = useMemo(
-    () => BigInt(utxoTotal?.coins || 0) + BigInt(lovelaceRewards || 0),
-    [lovelaceRewards, utxoTotal]
+    () => BigInt(utxoTotal?.coins || 0) + (isMidgardEnabled ? BigInt(0) : BigInt(lovelaceRewards || 0)),
+    [isMidgardEnabled, lovelaceRewards, utxoTotal]
   );
   // Wait for initial wallet's balance and price loading
   const isLoadingFirstTime = !utxoTotal || !priceResult.cardano;
@@ -121,6 +121,19 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
     return false;
   }, [assetsInfo, utxoTotal?.assets]);
 
+  const visibleTokenCount = useMemo(() => {
+    if (isNil(utxoTotal?.assets) || utxoTotal.assets.size === 0) return 0;
+
+    let count = 0;
+    for (const [assetId, assetBalance] of utxoTotal.assets) {
+      if (assetBalance <= 0) continue;
+      const assetInfo = assetsInfo?.get(assetId);
+      if (!assetInfo || !Wallet.util.isNFT(assetInfo)) count++;
+    }
+
+    return count;
+  }, [assetsInfo, utxoTotal?.assets]);
+
   /**
    * Transforms a non NFT asset to an IRow component for the AssetTable
    */
@@ -128,8 +141,9 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
     (assetId, withVisibleBalances = true) => {
       const info = assetsInfo?.get(assetId);
       const fiat = priceResult?.cardano?.price;
-      return !Wallet.util.mayBeNFT(info)
-        ? assetTransformer({
+      return info && Wallet.util.mayBeNFT(info)
+        ? undefined
+        : assetTransformer({
             key: assetId,
             fiat,
             token: info,
@@ -138,8 +152,7 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
             fiatCurrency,
             areBalancesVisible: withVisibleBalances || areBalancesVisible,
             balancesPlaceholder: hiddenBalancePlaceholder
-          })
-        : undefined;
+          });
     },
     [areBalancesVisible, assetsInfo, hiddenBalancePlaceholder, fiatCurrency, priceResult?.cardano, utxoTotal]
   );
@@ -175,8 +188,9 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
    * Assets are loading if only ADA was populated in the list and there are more assets to load and append to the UI.
    */
   const isBalanceLoading = useMemo(
-    () => hasTokens && fullAssetList.length < ASSETS_OTHER_THAN_ADA,
-    [hasTokens, fullAssetList]
+    () =>
+      hasTokens && (fullAssetList?.length ?? 0) < visibleTokenCount + (lovelaceBalanceWithRewards > BigInt(0) ? 1 : 0),
+    [fullAssetList?.length, hasTokens, lovelaceBalanceWithRewards, visibleTokenCount]
   );
 
   // Asset Table Pagination
@@ -226,6 +240,8 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
   );
 
   const onSendAssetClick = (id: string) => {
+    if (midgardSendBlockReason) return;
+
     // eslint-disable-next-line camelcase
     const postHogProperties: SendFlowAnalyticsProperties = { trigger_point: SendFlowTriggerPoints.TOKENS };
     setPickedCoin(SEND_COIN_OUTPUT_ID, { prev: cardanoCoin.id, next: id });
@@ -257,7 +273,7 @@ export const Assets = ({ topSection }: AssetsProps): React.ReactElement => {
     // TODO: refactor so we can use `getTokenList` [LW-6496]
     if (hasTokens) {
       for (const [assetId, assetBalance] of utxoTotal.assets) {
-        if (assetBalance <= 0) return;
+        if (assetBalance <= 0) continue;
         const asset = getTransformedAsset(assetId, false);
         if (asset) tokens.push(asset);
       }

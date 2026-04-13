@@ -21,6 +21,7 @@ import { Password } from '@input-output-hk/lace-ui-toolkit';
 import { logger } from '@lace/common';
 import { Bitcoin } from '@lace/bitcoin';
 import { bitcoinWalletManagerProperties, bitcoinWalletProperties } from '@lib/scripts/background/bitcoinWalletManager';
+import { MidgardSigningCoordinator } from './midgard-signing-coordinator';
 
 export const walletManager = consumeRemoteApi(
   { baseChannel: walletManagerChannel(process.env.WALLET_NAME), properties: walletManagerProperties },
@@ -78,8 +79,35 @@ export const signingCoordinator = new SigningCoordinator<Wallet.WalletMetadata, 
 );
 exposeSigningCoordinatorApi({ signingCoordinator }, { logger, runtime });
 
+export const midgardSigningCoordinator = new MidgardSigningCoordinator({ keyAgentFactory, logger });
+
 export const withSignTxConfirmation = async <T>(action: () => Promise<T>, password?: string): Promise<T> => {
   const subscription = signingCoordinator.transactionWitnessRequest$.subscribe(async (req) => {
+    try {
+      if (req.walletType === WalletType.InMemory) {
+        if (typeof password !== 'string') {
+          throw new TypeError('Invalid state: expected password for in-memory wallet');
+        }
+        const passphrase = Buffer.from(password, 'utf8');
+        await req.sign(passphrase).finally(() => passphrase.fill(0));
+      } else {
+        await req.sign();
+      }
+    } catch {
+      // nothing to do here, the error
+      // bubbles up when action rejects
+    }
+  });
+  try {
+    return await action();
+  } finally {
+    subscription.unsubscribe();
+    password = '';
+  }
+};
+
+export const withSignMidgardTxConfirmation = async <T>(action: () => Promise<T>, password?: string): Promise<T> => {
+  const subscription = midgardSigningCoordinator.transactionWitnessRequest$.subscribe(async (req) => {
     try {
       if (req.walletType === WalletType.InMemory) {
         if (typeof password !== 'string') {

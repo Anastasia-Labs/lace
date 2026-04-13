@@ -55,6 +55,7 @@
     "@stablelib/chacha20poly1305": "1.0.1",
     "@trezor/transport": "^1.1.18",
     "bignumber.js": "9.0.1",
+    "blake2b-no-wasm": "2.1.4",
     "buffer": "6.0.3",
     "classnames": "2.3.1",
     "dayjs": "1.10.7",

@@ -28,6 +28,7 @@ const DEFAULT_DEBOUNCE = 200;
 
 export interface AssetActivityItemProps {
   id?: string;
+  label?: string;
   /**
    * Amount formated with symbol (e.g. 50 ADA)
    */
@@ -102,6 +103,7 @@ const ActivityStatusIcon = ({ status, type }: ActivityStatusIconProps) => {
 
 // TODO: Handle pluralization and i18n of assetsNumber when we will have more than Ada.
 export const AssetActivityItem = ({
+  label,
   amount,
   fiatAmount,
   onClick,
@@ -192,15 +194,16 @@ export const AssetActivityItem = ({
 
   const isNegativeBalance = amount.startsWith('-');
 
-  const label =
-    isPendingTx &&
+  const resolvedLabel =
+    label ??
+    (isPendingTx &&
     type &&
     type !== TransactionActivityType.self &&
     !(type in DelegationActivityType) &&
     type !== ConwayEraCertificatesTypes.Registration &&
     type !== ConwayEraCertificatesTypes.Unregistration
       ? t('core.assetActivityItem.entry.name.sending')
-      : t(`core.assetActivityItem.entry.name.${type}` as unknown as CoreTranslationKey);
+      : t(`core.assetActivityItem.entry.name.${type}` as unknown as CoreTranslationKey));
 
   return (
     <div data-testid="asset-activity-item" onClick={onClick} className={styles.assetActivityItem}>
@@ -216,7 +219,7 @@ export const AssetActivityItem = ({
           <h6 data-testid="transaction-type" className={styles.title}>
             {isPendingTx && type === TransactionActivityType.incoming
               ? t('core.assetActivityItem.entry.name.receiving')
-              : label}
+              : resolvedLabel}
           </h6>
           {isAwaitingCoSigningTx ? (
             <p data-testid="timestamp" className={styles.description}>

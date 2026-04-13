@@ -82,37 +82,17 @@ $main-gap: 49px;
     margin: 0 size_unit(4) 0 size_unit(5);
   }
 
-  @media (min-width: $breakpoint-large) {
-    justify-content: center;
-  }
-
   &.noAside {
     @media (min-width: $breakpoint-small) {
-      @include full_content_grid($col-width-small, $grid-gap-small);
-    }
-
-    @media (min-width: $breakpoint-medium) {
-      @include full_content_grid($col-width-medium, $grid-gap-medium);
-    }
-
-    @media (min-width: $breakpoint-large) {
-      @include full_content_grid($col-width-large, $grid-gap-large);
+      grid-template-columns: $navigation-col-width minmax(0, 1fr);
     }
   }
 
   &.withAside {
     @media (min-width: $breakpoint-small) {
       grid-template-areas: 'nav main side-panel';
-      grid-template-rows: repeat(3, 1fr);
-      @include content_grid($col-width-small, $grid-gap-small);
-    }
-
-    @media (min-width: $breakpoint-medium) {
-      @include content_grid($col-width-medium, $grid-gap-medium);
-    }
-
-    @media (min-width: $breakpoint-large) {
-      @include content_grid($col-width-large, $grid-gap-large);
+      grid-template-rows: 1fr;
+      grid-template-columns: $navigation-col-width minmax(0, 1fr) clamp(300px, 28vw, 420px);
     }
   }
 }

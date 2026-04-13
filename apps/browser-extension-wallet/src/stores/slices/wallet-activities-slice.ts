@@ -6,6 +6,7 @@ import BigNumber from 'bignumber.js';
 import groupBy from 'lodash/groupBy';
 import flatten from 'lodash/flatten';
 import memoize from 'lodash/memoize';
+import { logger } from '@lace/common';
 import { Wallet } from '@lace/cardano';
 import { Reward, Serialization, epochSlotsCalc } from '@cardano-sdk/core';
 import {
@@ -42,6 +43,19 @@ import { rewardHistoryTransformer } from '@src/views/browser-view/features/activ
 import { isKeyHashAddress } from '@cardano-sdk/wallet';
 import { ObservableWalletState } from '@hooks/useWalletState';
 import { IBlockchainProvider } from './blockchain-provider-slice';
+import {
+  getPendingMidgardActivityGroupTitle,
+  getPendingMidgardActivityLabel,
+  isMidgardActivity,
+  isMidgardActivityLabel
+} from '@src/views/browser-view/features/activity/helpers/midgard-activity';
+import {
+  MidgardPendingActivity,
+  MidgardSlice,
+  isMidgardLegacyPendingActivityRecord,
+  isMidgardNativePendingActivityRecord,
+  midgardPendingActivityMatchesTxIds
+} from './midgard-slice';
 
 export interface FetchWalletActivitiesProps {
   fiatCurrency: CurrencyInfo;
@@ -57,12 +71,14 @@ interface FetchWalletActivitiesPropsWithSetter extends FetchWalletActivitiesProp
       ActivityDetailSlice &
       AssetDetailsSlice &
       UISlice &
-      BlockchainProviderSlice
+      BlockchainProviderSlice &
+      MidgardSlice
   >;
   set: SetState<WalletActivitiesSlice>;
 }
 
 type ExtendedActivityProps = TransformedActivity & AssetActivityItemProps;
+type WalletActivitiesMapper = (...args: Parameters<typeof mapWalletActivities>) => ReturnType<typeof mapWalletActivities>;
 
 type extendedDelegationActivityType =
   | DelegationActivityType
@@ -119,6 +135,22 @@ const initialState = {
   walletActivitiesStatus: StateStatus.IDLE
 };
 
+const dependencyIdentityCache = new WeakMap<object, number>();
+let nextDependencyIdentity = 0;
+
+const getDependencyIdentity = (dependency: object | undefined): string => {
+  if (!dependency) return 'none';
+
+  const cachedIdentity = dependencyIdentityCache.get(dependency);
+  if (cachedIdentity) {
+    return cachedIdentity.toString();
+  }
+
+  const nextIdentity = ++nextDependencyIdentity;
+  dependencyIdentityCache.set(dependency, nextIdentity);
+  return nextIdentity.toString();
+};
+
 export const mapWalletActivities = memoize(
   async (
     {
@@ -133,17 +165,22 @@ export const mapWalletActivities = memoize(
     {
       assetDetails,
       assetProvider,
+      chainHistoryProvider,
       cardanoCoin,
       setRewardsActivityDetail,
       setTransactionActivityDetail,
+      midgardPendingActivities,
+      isMidgardEnabled,
+      environmentName,
       isSharedWallet,
       inputResolver
     }: Pick<UISlice['walletUI'], 'cardanoCoin'> &
       Pick<ActivityDetailSlice, 'setRewardsActivityDetail' | 'setTransactionActivityDetail'> &
       Pick<AssetDetailsSlice, 'assetDetails'> &
-      Pick<IBlockchainProvider, 'inputResolver'> &
+      Pick<IBlockchainProvider, 'chainHistoryProvider' | 'inputResolver'> &
       Pick<IBlockchainProvider, 'assetProvider'> &
-      Pick<WalletInfoSlice, 'isSharedWallet'>
+      Pick<MidgardSlice, 'midgardPendingActivities' | 'isMidgardEnabled'> &
+      Pick<WalletInfoSlice, 'environmentName' | 'isSharedWallet'>
   ) => {
     const epochRewardsMapper = (earnedEpoch: Wallet.Cardano.EpochNo, rewards: Reward[]): ExtendedActivityProps => {
       const spendableEpoch = (earnedEpoch + REWARD_SPENDABLE_DELAY_EPOCHS) as Wallet.Cardano.EpochNo;
@@ -179,6 +216,35 @@ export const mapWalletActivities = memoize(
     if (keyHashAddresses.length !== addresses.length) {
       throw new Error('TODO: implement script address support');
     }
+
+    const resolvePendingMidgardTransaction = async (
+      pendingActivity: MidgardPendingActivity
+    ): Promise<Wallet.Cardano.HydratedTx | Wallet.Cardano.Tx> => {
+      if (isMidgardNativePendingActivityRecord(pendingActivity)) {
+        return Wallet.decodeMidgardPendingTx(pendingActivity.nativeTxCbor);
+      }
+
+      try {
+        const [resolvedTx] = await chainHistoryProvider.transactionsByHashes({
+          ids: [Wallet.Cardano.TransactionId(pendingActivity.txId)]
+        });
+        if (resolvedTx) {
+          return resolvedTx;
+        }
+      } catch {
+        // Fall back to the locally persisted transaction below while the Midgard tx is not yet queryable.
+      }
+
+      if (isMidgardLegacyPendingActivityRecord(pendingActivity)) {
+        return {
+          ...Serialization.TxCBOR.deserialize(pendingActivity.txCbor),
+          id: Wallet.Cardano.TransactionId(pendingActivity.txId)
+        } as Wallet.Cardano.Tx;
+      }
+
+      throw new Error(`Unsupported Midgard pending activity format: ${(pendingActivity as MidgardPendingActivity).txFormat}`);
+    };
+
     const historicTransactionMapper = async ({
       tx
     }: {
@@ -195,6 +261,7 @@ export const mapWalletActivities = memoize(
         protocolParameters,
         cardanoCoin,
         resolveInput,
+        environmentName,
         isSharedWallet
       });
 
@@ -257,6 +324,45 @@ export const mapWalletActivities = memoize(
       return transformedTransaction.map((tt) => extendWithClickHandler(tt));
     };
 
+    const pendingMidgardActivityMapper = async (
+      pendingActivity: MidgardPendingActivity
+    ): Promise<ExtendedActivityProps[]> => {
+      const resolvedTx = await resolvePendingMidgardTransaction(pendingActivity);
+      const transformedTransaction = await pendingTxTransformer({
+        tx: resolvedTx as unknown as Wallet.TxInFlight,
+        walletAddresses: keyHashAddresses,
+        fiatPrice: cardanoFiatPrice,
+        fiatCurrency,
+        protocolParameters,
+        cardanoCoin,
+        date: new Date(pendingActivity.createdAt),
+        resolveInput,
+        isSharedWallet
+      });
+      const label =
+        pendingActivity.kind === 'send' ? undefined : getPendingMidgardActivityLabel(resolvedTx, environmentName);
+      const formattedDate =
+        pendingActivity.kind === 'send'
+          ? undefined
+          : getPendingMidgardActivityGroupTitle(resolvedTx, environmentName);
+
+      return transformedTransaction.map((transformedTx) => ({
+        ...transformedTx,
+        id: pendingActivity.txId,
+        ...(label && { label }),
+        ...(formattedDate && { formattedDate }),
+        onClick: () => {
+          if (sendAnalytics) sendAnalytics();
+          setTransactionActivityDetail({
+            activity: resolvedTx,
+            direction: transformedTx.direction,
+            status: ActivityStatus.PENDING,
+            type: transformedTx.type
+          });
+        }
+      }));
+    };
+
     const filterTransactionByAssetId = async (txs: Wallet.Cardano.HydratedTx[]) => {
       const txsWithType = await Promise.all(
         txs.map(async (tx) => {
@@ -277,18 +383,30 @@ export const mapWalletActivities = memoize(
      * Sanitizes historical transactions data
      */
     const getHistoricalTransactions = async () => {
+      const visibleHistory = isMidgardEnabled
+        ? transactions.history.filter((tx) => isMidgardActivity(tx, environmentName))
+        : transactions.history;
+
       const filtered =
         !assetDetails || assetDetails?.id === cardanoCoin.id
-          ? transactions.history.map((tx) => ({ tx }))
-          : await filterTransactionByAssetId(transactions.history);
+          ? visibleHistory.map((tx) => ({ tx }))
+          : await filterTransactionByAssetId(visibleHistory);
       return flatten(await Promise.all(filtered.map((tx) => historicTransactionMapper(tx))));
     };
 
     /**
      * Sanitizes pending transactions data
      */
-    const getPendingTransactions = async (): Promise<ExtendedActivityProps[]> =>
-      flatten([
+    const getPendingTransactions = async (): Promise<ExtendedActivityProps[]> => {
+      const walletAddressSet = new Set(keyHashAddresses.map(({ address }) => address.toString()));
+      const confirmedHistoryTxIds = new Set(transactions.history.map(({ id }) => id.toString()));
+      const visibleMidgardPendingActivities = midgardPendingActivities.filter(
+        (pendingActivity: MidgardPendingActivity) =>
+          walletAddressSet.has(pendingActivity.address) &&
+          !midgardPendingActivityMatchesTxIds(pendingActivity, confirmedHistoryTxIds)
+      );
+
+      return flatten([
         ...(await Promise.all(transactions.outgoing.inFlight.map((tx) => pendingTransactionMapper(tx)))),
         ...(isSharedWallet
           ? await Promise.all(
@@ -296,8 +414,14 @@ export const mapWalletActivities = memoize(
                 pendingTransactionMapper(tx, Wallet.TransactionStatus.AWAITING_COSIGNATURES)
               )
             )
-          : [])
+          : []),
+        ...(await Promise.all(
+          visibleMidgardPendingActivities.map((pendingActivity: MidgardPendingActivity) =>
+            pendingMidgardActivityMapper(pendingActivity)
+          )
+        ))
       ]);
+    };
 
     /**
      * Sanitizes historical rewards data
@@ -322,15 +446,15 @@ export const mapWalletActivities = memoize(
     const oldestHistoricalTxDate = withLimitedRewardsHistory
       ? historicalTransactions[historicalTransactions.length - 1]?.date
       : undefined;
-    const rewards = assetDetails ? [] : getRewardsHistory(oldestHistoricalTxDate);
+    const rewards = assetDetails || isMidgardEnabled ? [] : getRewardsHistory(oldestHistoricalTxDate);
 
     const confirmedTxs = historicalTransactions;
     const pendingTxs = pendingTransactions;
     /* After the transaction is confirmed is not being removed from pendingTransactions$, so we have to remove it manually from pending list
       this is a workaround, as it seems to be an issue on the sdk side
       */
-    const filteredPendingTxs = pendingTxs.filter((pending) =>
-      confirmedTxs.some((confirmed) => confirmed?.id !== pending?.id)
+    const filteredPendingTxs = pendingTxs.filter(
+      (pending) => !confirmedTxs.some((confirmed) => confirmed?.id === pending?.id)
     );
 
     const allTransactions = [...filteredPendingTxs, ...confirmedTxs, ...rewards];
@@ -353,10 +477,11 @@ export const mapWalletActivities = memoize(
 
     const allTransactionsTransformed = allTransactions.map((activity) => ({
       ...activity,
-      ...(isDelegationActivity(activity) && {
-        amount: `${getDelegationAmount(activity)} ${cardanoCoin.symbol}`,
-        fiatAmount: `${getFiatAmount(getDelegationAmount(activity), cardanoFiatPrice)} ${fiatCurrency.code}`
-      }),
+      ...(isDelegationActivity(activity) &&
+        !isMidgardActivityLabel(activity.label) && {
+          amount: `${getDelegationAmount(activity)} ${cardanoCoin.symbol}`,
+          fiatAmount: `${getFiatAmount(getDelegationAmount(activity), cardanoFiatPrice)} ${fiatCurrency.code}`
+        }),
       assets: activity.assets.map((asset: ActivityAssetProp) => {
         const assetId = Wallet.Cardano.AssetId(asset.id);
         const token = assetsInfo.get(assetId);
@@ -415,75 +540,123 @@ export const mapWalletActivities = memoize(
   (
     { addresses, transactions, assetInfo, delegation: { rewardsHistory } },
     { cardanoFiatPrice, fiatCurrency },
-    { cardanoCoin, assetDetails, isSharedWallet }
-  ) =>
-    `${transactions.history.map(({ id }) => id).join('')}_${transactions.outgoing.inFlight
-      // eslint-disable-next-line sonarjs/no-nested-template-literals
-      .map(({ id, submittedAt }) => `${id}_${submittedAt}`)
-      .join('')}_${transactions.outgoing.signed?.map(({ tx: { id } }) => id).join('')}_${assetInfo.size}_${
-      rewardsHistory.all.length
-    }_${cardanoFiatPrice}_${fiatCurrency.code}_${cardanoCoin?.id}_${assetDetails?.id}_${
-      addresses[0]?.address
-    }_${isSharedWallet}`
+    {
+      assetProvider,
+      chainHistoryProvider,
+      cardanoCoin,
+      assetDetails,
+      environmentName,
+      inputResolver,
+      isSharedWallet,
+      midgardPendingActivities,
+      isMidgardEnabled
+    }
+  ) => {
+    const historyKey = transactions.history.map(({ id }) => id).join('');
+    const inFlightKey = transactions.outgoing.inFlight.map(({ id, submittedAt }) => `${id}_${submittedAt}`).join('');
+    const signedKey = transactions.outgoing.signed?.map(({ tx: { id } }) => id).join('') ?? '';
+    const addressesKey = addresses.map(({ address }) => address.toString()).join('|');
+    const providerKey = [
+      getDependencyIdentity(assetProvider),
+      getDependencyIdentity(chainHistoryProvider),
+      getDependencyIdentity(inputResolver)
+    ].join('_');
+    const midgardPendingKey = midgardPendingActivities
+      .map(
+        (pendingActivity: MidgardPendingActivity) =>
+          `${pendingActivity.txFormat}_${pendingActivity.txId}_${pendingActivity.cardanoTxId ?? ''}_${pendingActivity.address}_${pendingActivity.createdAt}_${pendingActivity.kind}_${
+            isMidgardNativePendingActivityRecord(pendingActivity)
+              ? pendingActivity.nativeTxCbor
+              : pendingActivity.txCbor
+          }`
+      )
+      .join('');
+
+    return `${historyKey}_${inFlightKey}_${signedKey}_${midgardPendingKey}_${assetInfo.size}_${rewardsHistory.all.length}_${cardanoFiatPrice}_${fiatCurrency.code}_${cardanoCoin?.id}_${assetDetails?.id}_${addressesKey}_${environmentName}_${isSharedWallet}_${isMidgardEnabled}_${providerKey}`;
+  }
 );
 
-const getWalletActivities = async ({
+export const createGetWalletActivities = ({
   set,
   get,
-  ...fetchActivitiesProps
-}: FetchWalletActivitiesPropsWithSetter): Promise<void> => {
-  set({ walletActivitiesStatus: StateStatus.LOADING });
-  const {
-    walletUI: { cardanoCoin },
-    walletState,
-    setTransactionActivityDetail,
-    setRewardsActivityDetail,
-    assetDetails,
-    blockchainProvider: { assetProvider, inputResolver },
-    isSharedWallet
-  } = get();
-  if (!walletState) {
-    set(initialState);
-    return;
-  }
+  mapWalletActivitiesImpl = mapWalletActivities
+}: Pick<FetchWalletActivitiesPropsWithSetter, 'set' | 'get'> & {
+  mapWalletActivitiesImpl?: WalletActivitiesMapper;
+}): WalletActivitiesSlice['getWalletActivities'] => {
+  let latestRequestId = 0;
 
-  const { walletActivities, activitiesCount } = await mapWalletActivities(walletState, fetchActivitiesProps, {
-    assetProvider,
-    cardanoCoin,
-    setRewardsActivityDetail,
-    setTransactionActivityDetail,
-    assetDetails,
-    inputResolver,
-    isSharedWallet
-  });
+  return async ({ fiatCurrency, cardanoFiatPrice, sendAnalytics, withLimitedRewardsHistory }): Promise<void> => {
+    const requestId = ++latestRequestId;
 
-  set({
-    walletActivities,
-    activitiesCount,
-    walletActivitiesStatus: StateStatus.LOADED
-  });
+    set({ walletActivitiesStatus: StateStatus.LOADING });
+
+    const {
+      walletUI: { cardanoCoin },
+      walletState,
+      setTransactionActivityDetail,
+      setRewardsActivityDetail,
+      assetDetails,
+      blockchainProvider: { assetProvider, chainHistoryProvider, inputResolver },
+      midgardPendingActivities,
+      isMidgardEnabled,
+      environmentName,
+      isSharedWallet
+    } = get();
+
+    if (!walletState) {
+      if (requestId !== latestRequestId) return;
+      set(initialState);
+      return;
+    }
+
+    try {
+      const { walletActivities, activitiesCount } = await mapWalletActivitiesImpl(
+        walletState,
+        { fiatCurrency, cardanoFiatPrice, sendAnalytics, withLimitedRewardsHistory },
+        {
+          assetProvider,
+          chainHistoryProvider,
+          cardanoCoin,
+          setRewardsActivityDetail,
+          setTransactionActivityDetail,
+          assetDetails,
+          inputResolver,
+          midgardPendingActivities,
+          isMidgardEnabled,
+          environmentName,
+          isSharedWallet
+        }
+      );
+
+      if (requestId !== latestRequestId) return;
+
+      set({
+        walletActivities,
+        activitiesCount,
+        walletActivitiesStatus: StateStatus.LOADED
+      });
+    } catch (error) {
+      if (requestId !== latestRequestId) return;
+
+      logger.error('Failed to load wallet activities', error);
+      set({ walletActivitiesStatus: StateStatus.ERROR });
+    }
+  };
 };
 
 /**
  * has all wallet activities related actions and states
  */
 export const walletActivitiesSlice: SliceCreator<
-  WalletInfoSlice & WalletActivitiesSlice & ActivityDetailSlice & AssetDetailsSlice & UISlice & BlockchainProviderSlice,
+  WalletInfoSlice &
+    WalletActivitiesSlice &
+    ActivityDetailSlice &
+    AssetDetailsSlice &
+    UISlice &
+    BlockchainProviderSlice &
+    MidgardSlice,
   WalletActivitiesSlice
 > = ({ set, get }) => ({
-  getWalletActivities: ({
-    fiatCurrency,
-    cardanoFiatPrice,
-    sendAnalytics,
-    withLimitedRewardsHistory
-  }: FetchWalletActivitiesProps) =>
-    getWalletActivities({
-      fiatCurrency,
-      cardanoFiatPrice,
-      sendAnalytics,
-      withLimitedRewardsHistory,
-      set,
-      get
-    }),
+  getWalletActivities: createGetWalletActivities({ set, get }),
   ...initialState
 });

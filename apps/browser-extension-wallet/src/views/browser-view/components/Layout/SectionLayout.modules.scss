@@ -22,9 +22,10 @@ $aside-width-large: 420px;
   flex-direction: column;
   justify-content: space-between;
   padding-left: size_unit(2);
+  min-width: 0;
+  width: 100%;
 
   @media (max-width: $breakpoint-minimum) {
-    min-width: 567px;
     padding-right: 24px;
   }
 
@@ -33,6 +34,11 @@ $aside-width-large: 420px;
       margin-top: 120px;
     }
   }
+}
+
+.contentInner {
+  min-width: 0;
+  width: 100%;
 }
 
 .sidePanelContainer {
@@ -98,29 +104,52 @@ $aside-width-large: 420px;
   }
 }
 
+.topNavigationStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  width: 100%;
+  max-width: $aside-width-large;
+}
+
+.midgardNavigation {
+  width: 100%;
+  max-width: $aside-width-large;
+}
+
 .navigationBoxFlexible {
   // TODO: update width from navigationBox to auto once feature is rollout
   width: auto;
 }
 
 .topNavigationBox {
-  position: absolute;
-  right: 0;
-  // Anchor to the right and size to content so it expands to the left
-  width: auto;
-  left: auto;
-  display: inline-flex; // shrink to content width
-  max-width: max-content; // ensure the box fits its contents only
-  align-items: center;
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin-bottom: 20px;
 }
 
 // Ensure the inner navigation box is not constrained by fixed aside widths
 .topNavigationBox .navigationBox {
-  width: auto;
+  width: 100%;
+  max-width: $aside-width-large;
+}
+
+.topNavigationBox .topNavigationStack {
+  width: 100%;
+  max-width: $aside-width-large;
+  margin-left: auto;
+}
+
+.topNavigationBox .midgardNavigation {
+  width: 100%;
+  max-width: $aside-width-large;
 }
 
 .sidePanelContentBox {
-  margin-top: 120px;
+  margin-top: 0;
 }
 
 .topBarAlignment {

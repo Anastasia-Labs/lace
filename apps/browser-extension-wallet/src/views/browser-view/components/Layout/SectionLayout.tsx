@@ -27,7 +27,7 @@ export const SectionLayout = ({
   return (
     <>
       <main id={CONTENT_ID} className={classNames(styles.content, !!sidePanelContent && styles.withAside)}>
-        <div>{children}</div>
+        <div className={styles.contentInner}>{children}</div>
         {hasCredit && <Credit handleOnClick={handleOnClick} />}
       </main>
       <SidePanel sidePanelContent={sidePanelContent} isSidePanelFixed={isSidePanelFixed} />

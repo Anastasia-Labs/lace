@@ -7,26 +7,37 @@
 
     .ant-drawer-content-wrapper {
       box-shadow: none !important;
+      box-sizing: border-box;
+      display: flex !important;
+      height: 100dvh !important;
+      max-height: 100dvh !important;
       padding: size_unit(3) !important;
     }
 
     .ant-drawer-wrapper-body {
-      display: flex;
-      flex-direction: column;
-      gap: 0px;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .ant-drawer-content {
       border-radius: size_unit(4) !important;
       background-color: var(--bg-color-modal, #ffffff);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
       @include scroll-bar-style;
     }
 
     .ant-drawer-body {
-      display: flex !important;
-      flex-direction: column !important;
+      display: grid !important;
+      flex: 1 1 auto !important;
+      grid-template-rows: auto minmax(0, 1fr) auto;
       height: 100% !important;
       margin-top: 0px !important;
+      min-height: 0 !important;
+      overflow: hidden !important;
       padding: 0px !important;
     }
 
@@ -38,11 +49,18 @@
 }
 
 .browserView {
-  .ant-drawer-content-wrapper {
-    margin-right: -#{size_unit(3)} !important;
-  }
-  .ant-drawer-content {
-    width: size_unit(83) !important;
+  :global {
+    .ant-drawer-content-wrapper {
+      margin-right: -#{size_unit(3)} !important;
+
+      @media (max-height: 820px) {
+        padding: size_unit(2) !important;
+      }
+    }
+
+    .ant-drawer-content {
+      width: size_unit(83) !important;
+    }
   }
 }
 
@@ -51,9 +69,6 @@
     .ant-drawer-content-wrapper {
       padding: 0 !important;
       width: 100%;
-    }
-    .ant-drawer-body {
-      overflow: visible !important;
     }
     .ant-drawer-content {
       border-radius: 0 !important;
@@ -82,30 +97,45 @@
   }
 
   .footer {
-    padding: size_unit(2) size_unit(3);
+    padding: size_unit(1.5) size_unit(3);
   }
 }
 
 .content {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
-  padding-top: size_unit(4.5) !important;
+  overflow: hidden;
+  padding-top: size_unit(3) !important;
+
+  @media (max-height: 820px) {
+    padding-top: size_unit(2) !important;
+  }
+
   @media (max-width: $breakpoint-popup) {
-    padding-top: size_unit(1) !important;
-    padding-bottom: size_unit(2) !important;
+    padding-top: size_unit(0.5) !important;
+    padding-bottom: size_unit(1.5) !important;
   }
   .scrollableContent {
     display: flex;
     flex-direction: column;
-    flex: 1;
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior: contain;
     padding-left: size_unit(5);
+    padding-bottom: size_unit(2);
     padding-right: size_unit(3);
     margin-right: size_unit(2);
+
+    @media (max-height: 820px) {
+      margin-right: size_unit(1);
+      padding-bottom: size_unit(1.5);
+      padding-left: size_unit(4);
+      padding-right: size_unit(2);
+    }
 
     @include scroll-bar-style;
 
@@ -117,6 +147,15 @@
 }
 
 .footer {
-  padding: size_unit(3) size_unit(5);
+  padding: size_unit(2) size_unit(4);
   border-top: 1px solid var(--light-mode-light-grey-plus, var(--dark-mode-mid-grey));
+  background-color: var(--bg-color-modal, #ffffff);
+  box-shadow: 0 -10px 24px rgba(17, 24, 39, 0.06);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
+
+  @media (max-height: 820px) {
+    padding: size_unit(1.5) size_unit(3);
+  }
 }

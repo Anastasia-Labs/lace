@@ -19,8 +19,8 @@ import { Voting } from '@src/features/voting-beta/components';
 const { GOV_TOOLS_URLS } = config();
 
 export const ExtensionRoutes = (): React.ReactElement => {
-  const { isSharedWallet, environmentName } = useWalletStore();
-  const isVotingCenterEnabled = !!GOV_TOOLS_URLS[environmentName];
+  const { isSharedWallet, environmentName, isMidgardEnabled } = useWalletStore();
+  const isVotingCenterEnabled = !!GOV_TOOLS_URLS[environmentName] && !isMidgardEnabled;
 
   return (
     <MainLayout>
@@ -30,7 +30,9 @@ export const ExtensionRoutes = (): React.ReactElement => {
         <Route exact path={walletRoutePaths.activity} component={Activity} />
         <Route exact path={walletRoutePaths.send} component={Send} />
         <Route exact path={walletRoutePaths.nftDetail} component={NftDetail} />
-        {!isSharedWallet && <Route exact path={walletRoutePaths.earn} component={DelegationContainer} />}
+        {!isSharedWallet && !isMidgardEnabled && (
+          <Route exact path={walletRoutePaths.earn} component={DelegationContainer} />
+        )}
         <Route exact path={walletRoutePaths.addressBook} component={AddressBook} />
         <Route exact path={walletRoutePaths.settings} component={Settings} />
         <Route exact path={walletRoutePaths.signMessage} component={SignMessageDrawer} />

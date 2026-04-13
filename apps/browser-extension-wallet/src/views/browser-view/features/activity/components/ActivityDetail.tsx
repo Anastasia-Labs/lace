@@ -22,6 +22,7 @@ import { TransactionDetailsProxy } from './TransactionDetailsProxy';
 import { useTranslation } from 'react-i18next';
 import type { TranslationKey } from '@lace/translation';
 import { SharedWalletTransactionDetailsWrapper } from './SharedWalletTransactionDetailsWrapper';
+import { getMidgardActivityLabel, getPendingMidgardActivityLabel } from '../helpers/midgard-activity';
 
 const MAX_SUMMARY_ADDRESSES = 5;
 
@@ -97,6 +98,7 @@ const getTypeLabel = (type: ActivityType): TranslationKey => {
 
 export const ActivityDetail = ({ price }: ActivityDetailProps): ReactElement => {
   const {
+    environmentName,
     walletUI: { cardanoCoin }
   } = useWalletStore();
   const { t } = useTranslation();
@@ -124,10 +126,15 @@ export const ActivityDetail = ({ price }: ActivityDetailProps): ReactElement => 
 
   if (fetchingActivityInfo || !activityInfo) return <Skeleton data-testid="transaction-details-skeleton" />;
 
+  const resolvedMidgardActivity =
+    activityDetail.type !== TransactionActivityType.rewards ? activityDetail.activity : undefined;
+  const canOpenExternalHashLink =
+    resolvedMidgardActivity &&
+    Wallet.getMidgardTxProvenance(resolvedMidgardActivity) !== Wallet.MidgardTxProvenance.Layer2Native;
   const name =
     activityInfo.status === ActivityStatus.PENDING
-      ? t('core.activityDetails.sending')
-      : t(getTypeLabel(activityInfo.type));
+      ? getPendingMidgardActivityLabel(resolvedMidgardActivity, environmentName) ?? t('core.activityDetails.sending')
+      : getMidgardActivityLabel(resolvedMidgardActivity, environmentName) ?? t(getTypeLabel(activityInfo.type));
 
   const amountTransformer = (ada: string) =>
     `${Wallet.util.convertAdaToFiat({ ada, fiat: price?.cardano?.price })} ${fiatCurrency?.code}`;
@@ -161,6 +168,7 @@ export const ActivityDetail = ({ price }: ActivityDetailProps): ReactElement => 
       activityInfo={activityInfo}
       direction={activityDetail.direction}
       status={currentTransactionStatus}
+      canOpenExternalHashLink={!!canOpenExternalHashLink}
       amountTransformer={amountTransformer}
     />
   );

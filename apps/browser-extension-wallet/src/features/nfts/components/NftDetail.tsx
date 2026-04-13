@@ -17,6 +17,7 @@ import { buttonIds } from '@hooks/useEnterKeyPress';
 import { withNftsFoldersContext } from '../context';
 import { usePostHogClientContext } from '@providers/PostHogClientProvider';
 import { NFTPrintLabDialog } from '@src/views/browser-view/features/nfts/components/NFTPrintLabDialog';
+import { getMidgardSendBlockReason } from '@src/stores/slices/midgard-slice';
 
 export const NFTPRINTLAB_URL = process.env.NFTPRINTLAB_URL;
 
@@ -25,7 +26,12 @@ export const NftDetail = withNftsFoldersContext((): React.ReactElement => {
   const {
     inMemoryWallet,
     walletUI: { appMode },
-    currentChain
+    currentChain,
+    isInMemoryWallet,
+    isSharedWallet,
+    isMidgardEnabled,
+    midgardActivationStatus,
+    midgardHealthStatus
   } = useWalletStore();
   const { t } = useTranslation();
   const analytics = useAnalyticsContext();
@@ -38,6 +44,13 @@ export const NftDetail = withNftsFoldersContext((): React.ReactElement => {
   const assetsInfo = useAssetInfo();
   const setSendInitialState = useOutputInitialState();
   const openExternalLink = useExternalLinkOpener();
+  const isSendDisabled = !!getMidgardSendBlockReason({
+    isMidgardEnabled,
+    midgardActivationStatus,
+    midgardHealthStatus,
+    isInMemoryWallet,
+    isSharedWallet
+  });
 
   const assetId = Wallet.Cardano.AssetId(id);
   const assetInfo = assetsInfo?.get(assetId);
@@ -47,6 +60,8 @@ export const NftDetail = withNftsFoldersContext((): React.ReactElement => {
   const amount = useMemo(() => Wallet.util.calculateAssetBalance(bigintBalance, assetInfo), [assetInfo, bigintBalance]);
 
   const handleOpenSend = () => {
+    if (isSendDisabled) return;
+
     // eslint-disable-next-line camelcase
     analytics.sendEventToPostHog(PostHogAction.SendClick, { trigger_point: SendFlowTriggerPoints.NFTS });
     setSendInitialState(id, SEND_NFT_DEFAULT_AMOUNT);
@@ -77,7 +92,12 @@ export const NftDetail = withNftsFoldersContext((): React.ReactElement => {
         dataTestId="nft-details-drawer"
         footer={
           <div className={styles.footer}>
-            <Button id={buttonIds.nftDetailsBtnId} className={styles.sendBtn} onClick={handleOpenSend}>
+            <Button
+              id={buttonIds.nftDetailsBtnId}
+              className={styles.sendBtn}
+              onClick={handleOpenSend}
+              disabled={isSendDisabled}
+            >
               {t('core.nftDetail.sendNFT')}
             </Button>
           </div>

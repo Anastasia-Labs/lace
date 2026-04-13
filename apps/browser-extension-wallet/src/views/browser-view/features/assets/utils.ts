@@ -27,6 +27,8 @@ export const sortAssets = ({ sortBy: tokenA }: AssetSortBy, { sortBy: tokenB }: 
   if (tokenA.metadataName < tokenB.metadataName) return -1;
 
   // 4. order by Fingerprint (asc) if same Metadata Name
+  if (tokenA.fingerprint !== undefined && tokenB.fingerprint === undefined) return -1;
+  if (tokenA.fingerprint === undefined && tokenB.fingerprint !== undefined) return 1;
   if (tokenA.fingerprint > tokenB.fingerprint) return 1;
   if (tokenA.fingerprint < tokenB.fingerprint) return -1;
 

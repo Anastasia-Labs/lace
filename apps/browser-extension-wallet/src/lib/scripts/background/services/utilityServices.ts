@@ -290,7 +290,15 @@ const unhandledError$ = merge(
 
 const getAppVersion = async () => await process.env.APP_VERSION;
 
-export const exposeBackgroundService = (wallet$: Observable<ActiveWallet>): void => {
+export const exposeBackgroundService = ({
+  wallet$,
+  reloadWallet,
+  setMidgardModeAndReload
+}: {
+  wallet$: Observable<ActiveWallet>;
+  reloadWallet: () => Promise<void>;
+  setMidgardModeAndReload: (enabled: boolean) => Promise<{ effectiveEnabled: boolean }>;
+}): void => {
   const coinPrices = initializeCoinPrices(wallet$);
   const updatePrices = () => {
     fetchAdaPrice(coinPrices);
@@ -320,11 +328,8 @@ export const exposeBackgroundService = (wallet$: Observable<ActiveWallet>): void
         getAppVersion,
         backendFailures$,
         unhandledError$,
-        reloadWallet: async () => {
-          // This will be implemented to trigger a wallet reload
-          // For now, we'll just clear the provider cache
-          console.log('🔍 Debug: Background service reloadWallet called');
-        }
+        reloadWallet,
+        setMidgardModeAndReload
       }),
       baseChannel: BaseChannels.BACKGROUND_ACTIONS,
       properties: backgroundServiceProperties

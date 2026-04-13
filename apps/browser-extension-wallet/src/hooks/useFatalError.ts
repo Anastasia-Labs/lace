@@ -50,6 +50,8 @@ type FatalError = {
 };
 
 export const useFatalError = (): FatalError | undefined => {
+  if (process.env.BYPASS_FATAL_ERRORS === 'true') return undefined;
+
   const backgroundService = useBackgroundServiceAPIContext();
   const unhandledServiceWorkerError = useObservable(backgroundService.unhandledError$);
   const { cardanoWallet } = useWalletStore();

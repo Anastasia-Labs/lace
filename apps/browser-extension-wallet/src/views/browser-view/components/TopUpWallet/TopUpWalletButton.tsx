@@ -17,7 +17,7 @@ export const TopUpWalletButton = (): React.ReactElement => {
   const openExternalLink = useExternalLinkOpener();
   const { blockchain } = useCurrentBlockchain();
   const { walletInfo } = useWalletStore();
-  const walletAddress = walletInfo ? walletInfo.addresses[0].address.toString() : '';
+  const walletAddress = walletInfo?.addresses?.[0]?.address?.toString?.() || '';
   const isBitcoin = blockchain === 'bitcoin';
 
   return (

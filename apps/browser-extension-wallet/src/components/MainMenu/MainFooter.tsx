@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
-import { walletRoutePaths } from '../../routes';
+import { walletRoutePaths } from '../../routes/wallet-paths';
 
 import NftIconDefault from '../../assets/icons/nft-icon.component.svg';
 import NftIconActive from '../../assets/icons/active-nft-icon.component.svg';
@@ -37,18 +37,25 @@ import { config } from '@src/config';
 const { GOV_TOOLS_URLS } = config();
 
 const includesCoin = /coin/i;
+const NAVIGATION_ANALYTICS_ACTIONS: Partial<Record<string, PostHogAction>> = {
+  [walletRoutePaths.assets]: PostHogAction.TokenTokensClick,
+  [walletRoutePaths.earn]: PostHogAction.StakingClick,
+  [walletRoutePaths.activity]: PostHogAction.ActivityActivityClick,
+  [walletRoutePaths.nfts]: PostHogAction.NFTsClick,
+  [walletRoutePaths.voting]: PostHogAction.VotingClick
+};
 
-// eslint-disable-next-line complexity
+// eslint-disable-next-line complexity, sonarjs/cognitive-complexity
 export const MainFooter = (): React.ReactElement => {
   const location = useLocation<{ pathname: string }>();
   const history = useHistory();
   const analytics = useAnalyticsContext();
-  const { isSharedWallet, environmentName } = useWalletStore();
+  const { isSharedWallet, environmentName, isMidgardEnabled } = useWalletStore();
   const posthog = usePostHogClientContext();
   const backgroundServices = useBackgroundServiceAPIContext();
 
   const isDappExplorerEnabled = posthog.isFeatureFlagEnabled(ExperimentName.DAPP_EXPLORER);
-  const isVotingCenterEnabled = !!GOV_TOOLS_URLS[environmentName];
+  const isVotingCenterEnabled = !!GOV_TOOLS_URLS[environmentName] && !isMidgardEnabled;
   const currentLocation = location?.pathname;
   const isWalletIconActive =
     currentLocation === walletRoutePaths.assets || includesCoin.test(currentLocation) || currentLocation === '/';
@@ -70,32 +77,12 @@ export const MainFooter = (): React.ReactElement => {
   const VotingIcon = currentHoveredItem === MenuItemList.VOTING ? VotingIconHover : VotingIconDefault;
 
   const sendAnalytics = (postHogAction?: PostHogAction) => {
-    if (postHogAction) {
-      analytics.sendEventToPostHog(postHogAction);
-    }
+    if (!postHogAction) return;
+    analytics.sendEventToPostHog(postHogAction);
   };
 
   const handleNavigation = (path: string) => {
-    switch (path) {
-      case walletRoutePaths.assets:
-        sendAnalytics(PostHogAction.TokenTokensClick);
-        break;
-      case walletRoutePaths.earn:
-        sendAnalytics(PostHogAction.StakingClick);
-        break;
-      case walletRoutePaths.activity:
-        sendAnalytics(PostHogAction.ActivityActivityClick);
-        break;
-      case walletRoutePaths.nfts:
-        sendAnalytics(PostHogAction.NFTsClick);
-        break;
-      case walletRoutePaths.voting:
-        sendAnalytics(PostHogAction.VotingClick);
-        break;
-      case walletRoutePaths.dapps:
-        // TODO: LW-11885 send proper dapp explorer event
-        break;
-    }
+    sendAnalytics(NAVIGATION_ANALYTICS_ACTIONS[path]);
 
     if (path === walletRoutePaths.dapps) {
       backgroundServices.handleOpenBrowser({ section: BrowserViewSections.DAPP_EXPLORER });
@@ -140,7 +127,7 @@ export const MainFooter = (): React.ReactElement => {
             <TransactionsIcon className={styles.icon} />
           )}
         </button>
-        {!isSharedWallet && (
+        {!isSharedWallet && !isMidgardEnabled && (
           <button
             onMouseEnter={() => onMouseEnterItem(MenuItemList.STAKING)}
             onMouseLeave={onMouseLeaveItem}

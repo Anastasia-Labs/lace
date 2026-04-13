@@ -8,6 +8,8 @@ import { Wallet } from '@lace/cardano';
 import { AssetActivityListProps, useItemsPageSize } from '@lace/core';
 import { UseTxHistoryLoader, useTxHistoryLoader } from './useTxHistoryLoader';
 import { useAsyncSwitchMap } from '@hooks/useAsyncSwitchMap';
+import { ObservableWalletState } from './useWalletState';
+import { MidgardPendingActivity, midgardPendingActivityMatchesTxIds } from '@stores/slices/midgard-slice';
 
 type UseWalletActivitiesProps = {
   sendAnalytics: () => void;
@@ -16,16 +18,68 @@ type UseWalletActivitiesProps = {
 const noAnalyticsProps = { sendAnalytics: noop };
 type WalletActivities = Omit<WalletActivitiesSlice, 'getWalletActivities'>;
 
+const getConfirmedMidgardPendingActivityIds = ({
+  walletState,
+  midgardPendingActivities
+}: {
+  walletState: ObservableWalletState;
+  midgardPendingActivities: MidgardPendingActivity[];
+}): string[] => {
+  const walletAddressSet = new Set(walletState.addresses.map(({ address }) => address.toString()));
+  const confirmedHistoryTxIds = new Set(walletState.transactions.history.map(({ id }) => id.toString()));
+
+  return midgardPendingActivities
+    .filter(
+      (pendingActivity) =>
+        walletAddressSet.has(pendingActivity.address) &&
+        midgardPendingActivityMatchesTxIds(pendingActivity, confirmedHistoryTxIds)
+    )
+    .map(({ txId }) => txId);
+};
+
+const usePruneConfirmedMidgardPendingActivities = ({
+  walletState,
+  midgardPendingActivities,
+  removeMidgardPendingActivities
+}: {
+  walletState: ObservableWalletState | null;
+  midgardPendingActivities: MidgardPendingActivity[];
+  removeMidgardPendingActivities: (txIds: string[]) => void;
+}) => {
+  const confirmedMidgardPendingActivityIds = useMemo(
+    () => (walletState ? getConfirmedMidgardPendingActivityIds({ walletState, midgardPendingActivities }) : []),
+    [midgardPendingActivities, walletState]
+  );
+
+  useEffect(() => {
+    if (confirmedMidgardPendingActivityIds.length > 0) {
+      removeMidgardPendingActivities(confirmedMidgardPendingActivityIds);
+    }
+  }, [confirmedMidgardPendingActivityIds, removeMidgardPendingActivities]);
+};
+
 export const useWalletActivities = ({
   sendAnalytics,
   withLimitedRewardsHistory
 }: UseWalletActivitiesProps = noAnalyticsProps): WalletActivities => {
   const { fiatCurrency } = useCurrencyStore();
   const { priceResult } = useFetchCoinPrice();
-  const { getWalletActivities, walletActivitiesStatus, walletActivities, activitiesCount, walletState } =
-    useWalletStore();
+  const {
+    getWalletActivities,
+    walletActivitiesStatus,
+    walletActivities,
+    activitiesCount,
+    walletState,
+    midgardPendingActivities,
+    removeMidgardPendingActivities
+  } = useWalletStore();
 
   const cardanoFiatPrice = priceResult?.cardano?.price;
+  usePruneConfirmedMidgardPendingActivities({
+    walletState,
+    midgardPendingActivities,
+    removeMidgardPendingActivities
+  });
 
   const fetchWalletActivities = useCallback(async () => {
     fiatCurrency &&
@@ -48,7 +102,8 @@ export const useWalletActivities = ({
     walletState?.addresses,
     walletState?.assetInfo,
     walletState?.delegation.rewardsHistory,
-    walletState?.eraSummaries
+    walletState?.eraSummaries,
+    midgardPendingActivities
   ]);
 
   return {
@@ -78,13 +133,22 @@ export const useWalletActivitiesPaginated = ({
     setTransactionActivityDetail,
     setRewardsActivityDetail,
     assetDetails,
-    blockchainProvider: { assetProvider, inputResolver },
+    blockchainProvider: { assetProvider, chainHistoryProvider, inputResolver },
+    midgardPendingActivities,
+    removeMidgardPendingActivities,
+    environmentName,
+    isMidgardEnabled,
     isSharedWallet
   } = useWalletStore();
 
   const cardanoFiatPrice = priceResult?.cardano?.price;
 
   const pageSize = useItemsPageSize();
+  usePruneConfirmedMidgardPendingActivities({
+    walletState,
+    midgardPendingActivities,
+    removeMidgardPendingActivities
+  });
 
   const { loadMore: txHistoryLoaderLoadMore, retry, error, loadedHistory } = useTxHistoryLoader(pageSize);
 
@@ -101,20 +165,28 @@ export const useWalletActivitiesPaginated = ({
   const fetchActivitiesDeps = useMemo(
     () => ({
       assetProvider,
+      chainHistoryProvider,
       cardanoCoin,
       setRewardsActivityDetail,
       setTransactionActivityDetail,
       assetDetails,
       inputResolver,
+      midgardPendingActivities,
+      environmentName,
+      isMidgardEnabled,
       isSharedWallet
     }),
     [
       assetProvider,
+      chainHistoryProvider,
       cardanoCoin,
       setRewardsActivityDetail,
       setTransactionActivityDetail,
       assetDetails,
       inputResolver,
+      midgardPendingActivities,
+      environmentName,
+      isMidgardEnabled,
       isSharedWallet
     ]
   );

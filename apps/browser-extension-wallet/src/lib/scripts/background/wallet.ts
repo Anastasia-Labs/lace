@@ -5,15 +5,18 @@ import {
   combineLatest,
   defaultIfEmpty,
   EMPTY,
+  filter,
   firstValueFrom,
   from,
   map,
   Observable,
   of,
+  skip,
   Subject,
-  tap
+  tap,
+  timeout
 } from 'rxjs';
-import { getProviders, SESSION_TIMEOUT } from './config';
+import { clearProviderCache, getProviders, SESSION_TIMEOUT } from './config';
 import { createPersonalWallet, createSharedWallet, DEFAULT_POLLING_CONFIG, storage } from '@cardano-sdk/wallet';
 import { Cardano } from '@cardano-sdk/core';
 import {
@@ -445,6 +448,106 @@ export const walletManager = new WalletManager(
     managerStorage: webStorage.local
   }
 );
+
+const getCurrentCardanoProvidersMode = (): 'midgard' | 'cardano' | null => {
+  const providers = currentWalletProviders$.getValue();
+  if (!providers) return null;
+
+  return Wallet.isUsingMidgardProviders(providers) ? 'midgard' : 'cardano';
+};
+
+const waitForCardanoProvidersMode = async (
+  expectedMode: 'midgard' | 'cardano',
+  previousProviders: Wallet.WalletProvidersDependencies | null
+): Promise<void> => {
+  try {
+    await firstValueFrom(
+      currentWalletProviders$.pipe(
+        skip(1),
+        filter(
+          (providers): providers is Wallet.WalletProvidersDependencies => !!providers && providers !== previousProviders
+        ),
+        filter((providers) => (Wallet.isUsingMidgardProviders(providers) ? 'midgard' : 'cardano') === expectedMode),
+        timeout({
+          first: 15_000
+        })
+      )
+    );
+  } catch (error) {
+    logger.error('Timed out waiting for wallet providers to switch modes', {
+      expectedMode,
+      error
+    });
+    throw new Error(
+      expectedMode === 'midgard'
+        ? 'Timed out waiting for Midgard wallet providers to become active'
+        : 'Timed out waiting for Cardano wallet providers to become active'
+    );
+  }
+};
+
+export const reloadActiveWalletInBackground = async (): Promise<void> => {
+  const { activeBlockchain } = await getBackgroundStorage();
+  if (activeBlockchain === 'bitcoin') return;
+
+  const activeWallet = await firstValueFrom(walletManager.activeWalletId$);
+  if (!activeWallet) return;
+
+  clearProviderCache();
+  await walletManager.activate(activeWallet, true);
+};
+
+export const setMidgardModeAndReloadInBackground = async (enabled: boolean): Promise<{ effectiveEnabled: boolean }> => {
+  const { activeBlockchain } = await getBackgroundStorage();
+  const stored = await webStorage.local.get('midgardEnabled');
+  const previousEnabled = stored?.midgardEnabled === true;
+
+  const applyMode = async (nextEnabled: boolean): Promise<boolean> => {
+    await webStorage.local.set({ midgardEnabled: nextEnabled });
+
+    if (activeBlockchain === 'bitcoin') {
+      return nextEnabled;
+    }
+
+    const activeWallet = await firstValueFrom(walletManager.activeWalletId$);
+    if (!activeWallet) {
+      return nextEnabled;
+    }
+
+    const previousProviders = currentWalletProviders$.getValue();
+    const waitForProvidersSwitch = waitForCardanoProvidersMode(nextEnabled ? 'midgard' : 'cardano', previousProviders);
+
+    await reloadActiveWalletInBackground();
+    await waitForProvidersSwitch;
+
+    const currentMode = getCurrentCardanoProvidersMode();
+    return currentMode === 'midgard';
+  };
+
+  try {
+    const effectiveEnabled = await applyMode(enabled);
+    if (effectiveEnabled !== enabled) {
+      throw new Error(
+        enabled
+          ? 'Midgard activation finished without Midgard-backed wallet providers'
+          : 'Cardano mode activation finished without Cardano-backed wallet providers'
+      );
+    }
+
+    return { effectiveEnabled };
+  } catch (error) {
+    if (previousEnabled !== enabled) {
+      try {
+        await applyMode(previousEnabled);
+      } catch (restoreError) {
+        logger.error('Failed to restore the previous Midgard mode after activation error', restoreError);
+      }
+    }
+
+    throw error;
+  }
+};
+
 walletManager
   .initialize()
   .then(() => {

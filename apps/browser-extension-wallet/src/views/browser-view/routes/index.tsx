@@ -134,7 +134,8 @@ export const BrowserViewRoutes = ({ routesMap = defaultRoutes }: { routesMap?: R
     cardanoWallet,
     initialHdDiscoveryCompleted,
     isSharedWallet,
-    environmentName
+    environmentName,
+    isMidgardEnabled
   } = useWalletStore();
   const [{ chainName }] = useAppSettingsContext();
   const [isLoadingWalletInfo, setIsLoadingWalletInfo] = useState(true);
@@ -142,10 +143,10 @@ export const BrowserViewRoutes = ({ routesMap = defaultRoutes }: { routesMap?: R
   const { t } = useTranslation();
   const posthogClientInitialized = useIsPosthogClientInitialized();
   const location = useLocation<{ background?: Location<unknown> }>();
-  const isVotingCenterEnabled = !!GOV_TOOLS_URLS[environmentName];
+  const isVotingCenterEnabled = !!GOV_TOOLS_URLS[environmentName] && !isMidgardEnabled;
 
   const availableRoutes = routesMap.filter((route) => {
-    if (route.path === routes.staking && isSharedWallet) return false;
+    if (route.path === routes.staking && (isSharedWallet || isMidgardEnabled)) return false;
     if (route.path === routes.voting && !isVotingCenterEnabled) return false;
     return true;
   });
@@ -236,15 +237,19 @@ export const BrowserViewRoutes = ({ routesMap = defaultRoutes }: { routesMap?: R
     };
   });
 
+  const bypassSyncGate = process.env.BYPASS_FATAL_ERRORS === 'true';
   const isLoaded = useMemo(
     () =>
-      !!walletDisplayInfo &&
-      posthogClientInitialized &&
-      !isLoadingWalletInfo &&
-      walletInfo &&
-      walletState &&
-      initialHdDiscoveryCompleted,
+      bypassSyncGate
+        ? !!walletDisplayInfo && !isLoadingWalletInfo
+        : !!walletDisplayInfo &&
+          posthogClientInitialized &&
+          !isLoadingWalletInfo &&
+          walletInfo &&
+          walletState &&
+          initialHdDiscoveryCompleted,
     [
+      bypassSyncGate,
       posthogClientInitialized,
       isLoadingWalletInfo,
       walletInfo,

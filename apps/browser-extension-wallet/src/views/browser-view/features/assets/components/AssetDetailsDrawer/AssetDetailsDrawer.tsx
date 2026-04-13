@@ -11,12 +11,35 @@ import { ASSET_DRAWER_BODY_ID, AssetDetailsContainer } from './AssetDetailsConta
 import { useWalletStore } from '@src/stores';
 import { useAnalyticsContext } from '@providers';
 import { PostHogAction } from '@providers/AnalyticsProvider/analyticsTracker';
+import { getMidgardSendBlockReason } from '@src/stores/slices/midgard-slice';
 
-const renderFooter = (click: () => void, label: string, popupView?: boolean) => (
+const renderFooter = ({
+  click,
+  disabled,
+  label,
+  popupView,
+  statusMessage
+}: {
+  click: () => void;
+  disabled?: boolean;
+  label: string;
+  popupView?: boolean;
+  statusMessage?: string;
+}) => (
   <div className={classnames(styles.footerContainer, { [styles.footerContainerPopup]: popupView })}>
-    <Button id={buttonIds.tokenBtnId} onClick={click} className={styles.footerButton}>
+    <Button id={buttonIds.tokenBtnId} onClick={click} className={styles.footerButton} disabled={disabled}>
       {label}
     </Button>
+    {statusMessage && (
+      <div
+        role="status"
+        aria-live="polite"
+        style={{ marginTop: '8px', fontSize: '12px', lineHeight: '16px' }}
+        data-testid="asset-details-send-status"
+      >
+        {statusMessage}
+      </div>
+    )}
   </div>
 );
 
@@ -33,8 +56,25 @@ export const AssetDetailsDrawer = ({
   popupView = false
 }: AssetDetailsDrawerProps): React.ReactElement => {
   const { t } = useTranslation();
-  const { blockchainProvider, assetDetails, setAssetDetails } = useWalletStore();
+  const {
+    blockchainProvider,
+    assetDetails,
+    setAssetDetails,
+    isInMemoryWallet,
+    isMidgardEnabled,
+    midgardActivationStatus,
+    midgardHealthStatus,
+    isSharedWallet
+  } = useWalletStore();
   const analytics = useAnalyticsContext();
+  const sendDisabledMessage = getMidgardSendBlockReason({
+    isMidgardEnabled,
+    midgardActivationStatus,
+    midgardHealthStatus,
+    isInMemoryWallet,
+    isSharedWallet
+  });
+  const isSendDisabled = !!sendDisabledMessage;
 
   const isVisible = !!assetDetails;
 
@@ -47,7 +87,10 @@ export const AssetDetailsDrawer = ({
     }
   }, []);
 
-  const handleOpenSend = () => openSendDrawer(assetDetails?.id);
+  const handleOpenSend = () => {
+    if (isSendDisabled || !assetDetails?.id) return;
+    openSendDrawer(assetDetails.id);
+  };
 
   // Close asset details drawer if network (blockchainProvider) has changed
   useEffect(() => {
@@ -66,7 +109,13 @@ export const AssetDetailsDrawer = ({
           }}
         />
       }
-      footer={renderFooter(handleOpenSend, t('browserView.assets.send'), popupView)}
+      footer={renderFooter({
+        click: handleOpenSend,
+        label: t('browserView.assets.send'),
+        disabled: isSendDisabled || !assetDetails?.id,
+        popupView,
+        statusMessage: sendDisabledMessage
+      })}
       open={isVisible}
       destroyOnClose
       onClose={setVisibility}

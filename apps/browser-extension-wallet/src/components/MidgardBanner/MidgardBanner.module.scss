@@ -1,103 +1,509 @@
-.banner {
-  border-radius: 16px;
-  padding: 10px 16px;
-  margin: 4px 0 4px 0;
+@import '../../../../../packages/common/src/ui/styles/theme.scss';
+@import '../../../../../packages/common/src/ui/styles/abstracts/typography';
+
+.container {
+  width: 100%;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.banner {
+  width: 100%;
+  min-width: 0;
+  border-radius: 14px;
+  padding: 11px 12px;
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   background: var(--bg-color-container);
-  border: 2px solid var(--light-mode-light-grey-plus, var(--dark-mode-mid-grey));
-  transition: all 0.3s ease;
-  min-width: 200px; /* Ensure minimum width */
-  flex-shrink: 0; /* Prevent shrinking */
-  cursor: pointer; /* Show it's clickable */
-  user-select: none; /* Prevent text selection when clicking */
+  border: 1px solid var(--light-mode-light-grey-plus, var(--dark-mode-mid-grey));
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  user-select: none;
+  gap: 10px;
+}
+
+.bannerTextGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.bannerHeadingRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.text {
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--text-color-primary);
+  min-width: 0;
+}
+
+.bannerSubtitle {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-color-secondary);
+  min-width: 0;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+  background: var(--light-mode-light-grey-plus, var(--dark-mode-mid-grey));
+  white-space: nowrap;
+}
+
+.statusPillLoading {
+  gap: 6px;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: midgardPulse 1.15s ease-in-out infinite;
 }
 
 .enabled {
-  background: linear-gradient(135deg, #319647 0%, #74dd61 100%);
-  border: 2px solid #74dd61;
-  
+  background: linear-gradient(124deg, #2a7d3d 0%, #49b35b 55%, #7ad36a 100%);
+  border-color: #8be57c;
+  box-shadow: 0 8px 20px rgba(26, 91, 42, 0.22);
+
   .text {
-    color: #fafafa; /* Clean white text */
-    font-weight: 600;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Subtle depth */
+    color: #f9fff9;
+  }
+
+  .bannerSubtitle {
+    color: rgba(244, 255, 245, 0.9);
+  }
+
+  .statusPill {
+    color: #f5fff6;
+    background: rgba(10, 48, 20, 0.34);
   }
 
   :global(.ant-switch-checked) {
-    background-color: #319647 !important; /* White toggle */
+    background-color: #319647 !important;
     border-color: #319647 !important;
-    
+
     .ant-switch-handle::before {
-      background: #319647 !important; /* Dark green dot */
+      background: #319647 !important;
     }
   }
 }
 
-.container {
+.switching {
+  background: linear-gradient(124deg, rgba(24, 33, 27, 0.96) 0%, rgba(33, 73, 44, 0.94) 52%, rgba(63, 118, 66, 0.92) 100%);
+  border-color: rgba(116, 221, 97, 0.55);
+  box-shadow: 0 10px 24px rgba(12, 31, 17, 0.24);
+
+  .text {
+    color: #f7fff8;
+  }
+
+  .bannerSubtitle {
+    color: rgba(238, 255, 240, 0.88);
+  }
+
+  .statusPill {
+    color: #effff0;
+    background: rgba(8, 25, 12, 0.3);
+  }
+}
+
+.error {
+  border-color: rgba(214, 69, 69, 0.32);
+  background: linear-gradient(180deg, var(--bg-color-container) 0%, rgba(214, 69, 69, 0.08) 100%);
+
+  .statusPill {
+    color: #8c2f2f;
+    background: rgba(214, 69, 69, 0.12);
+  }
+}
+
+.degraded {
+  border-color: rgba(196, 132, 27, 0.36);
+  background: linear-gradient(180deg, var(--bg-color-container) 0%, rgba(196, 132, 27, 0.1) 100%);
+
+  .statusPill {
+    color: #8b5f13;
+    background: rgba(196, 132, 27, 0.15);
+  }
+}
+
+.actionPanel {
+  width: 100%;
+  background: linear-gradient(
+    180deg,
+    var(--bg-color-container) 0%,
+    var(--light-mode-light-grey, rgba(0, 0, 0, 0.015)) 100%
+  );
+  border: 1px solid var(--light-mode-light-grey-plus, var(--dark-mode-mid-grey));
+  border-radius: 14px;
+  padding: 10px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.statePanel {
+  width: 100%;
+  border-radius: 14px;
+  padding: 12px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  
-  /* Desktop - horizontal layout */
-  @media (min-width: 769px) {
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
-  }
-  
-  /* Mobile - make button full width and right below banner */
-  @media (max-width: 768px) {
-    gap: 8px;
-    /* Swap order: show Midgard banner first, then the action button */
-    .banner { order: 1; }
-    .actionButton { order: 2; }
-  }
+  border: 1px solid transparent;
 }
 
-.actionButton {
-  flex-shrink: 0;
-  width: 200px; /* Increased width to fit "Deposit to Midgard" on one line */
-  white-space: nowrap; /* Prevent text wrapping */
-  
-  /* Override border gradient to green while keeping hollow background */
-  background: linear-gradient(var(--color-white, var(--dark-mode-bg-black, #ffffff)), 
-              var(--color-white, var(--dark-mode-bg-black, #ffffff))) padding-box,
-              linear-gradient(135deg, #319647 0%, #74dd61 100%) border-box !important;
-  
-  &:hover:not(:disabled) {
-    background: linear-gradient(var(--color-white, var(--dark-mode-mid-grey, #ffffff)), 
-                var(--color-white, var(--dark-mode-mid-grey, #ffffff))) padding-box,
-                linear-gradient(135deg, #319647 0%, #74dd61 100%) border-box !important;
-  }
-  
-  &:active:not(:disabled) {
-    background: linear-gradient(var(--light-mode-light-grey, var(--dark-mode-bg-black, #f9f9f9)), 
-                var(--light-mode-light-grey, var(--dark-mode-bg-black, #f9f9f9))) padding-box,
-                linear-gradient(135deg, #319647 0%, #74dd61 100%) border-box !important;
-  }
-  
-  /* Desktop - align with banner */
-  @media (min-width: 769px) {
-    align-self: center;
-  }
-  
-  /* Mobile - full width and positioned right below banner */
-  @media (max-width: 768px) {
-    width: 100%;
-    align-self: stretch;
-  }
+.statePanelSwitching {
+  background: linear-gradient(180deg, rgba(49, 150, 71, 0.1) 0%, rgba(49, 150, 71, 0.04) 100%);
+  border-color: rgba(49, 150, 71, 0.24);
 }
 
-.disabled .text {
+.statePanelError {
+  background: linear-gradient(180deg, rgba(214, 69, 69, 0.08) 0%, rgba(214, 69, 69, 0.03) 100%);
+  border-color: rgba(214, 69, 69, 0.18);
+}
+
+.statePanelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.statePanelActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.statePanelHeadingGroup {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statePanelTitle {
+  @include text-bodySmall-semi-bold;
+  color: var(--text-color-primary);
+}
+
+.statePanelBody {
+  @include text-bodySmall-medium;
   color: var(--text-color-secondary);
 }
 
-.text {
-  font-size: 16px;
-  font-weight: 500;
-  transition: color 0.3s ease;
-  margin-right: 16px;
+.statePanelMeta {
+  @include text-form-label($weight: 600);
+  color: var(--text-color-secondary);
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.04);
+  white-space: nowrap;
+}
+
+.actionIntro {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.actionTitle {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-color-primary);
+}
+
+.actionHint {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-color-secondary);
+}
+
+.actionButtons {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 8px;
+
+  @media (max-width: 720px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.actionButton,
+.withdrawButton {
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  height: 42px;
+}
+
+.actionButton {
+  background: linear-gradient(var(--color-white, var(--dark-mode-bg-black, #ffffff)),
+              var(--color-white, var(--dark-mode-bg-black, #ffffff))) padding-box,
+              linear-gradient(135deg, #319647 0%, #74dd61 100%) border-box !important;
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(var(--color-white, var(--dark-mode-mid-grey, #ffffff)),
+                var(--color-white, var(--dark-mode-mid-grey, #ffffff))) padding-box,
+                linear-gradient(135deg, #319647 0%, #74dd61 100%) border-box !important;
+  }
+}
+
+.drawerBody {
+  display: flex;
+  flex-direction: column;
+  gap: size_unit(3);
+  padding-bottom: size_unit(2);
+}
+
+.drawerCard,
+.formCard,
+.noticeCard {
+  border: 1px solid var(--light-mode-light-grey-plus, var(--dark-mode-mid-grey));
+  border-radius: size_unit(3);
+  background: var(--color-white, var(--bg-color-modal, #ffffff));
+}
+
+.drawerCard,
+.formCard {
+  padding: size_unit(3);
+}
+
+.drawerCard {
+  display: flex;
+  flex-direction: column;
+  gap: size_unit(2);
+  background: linear-gradient(
+    180deg,
+    var(--color-white, var(--bg-color-modal, #ffffff)) 0%,
+    rgba(116, 221, 97, 0.08) 100%
+  );
+}
+
+.cardHeader,
+.formCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: size_unit(2);
+}
+
+.cardHeadingGroup,
+.formCardCopy {
+  display: flex;
+  flex-direction: column;
+  gap: size_unit(0.5);
+  min-width: 0;
+}
+
+.cardEyebrow,
+.fieldLabel {
+  @include text-form-label($weight: 600);
+  color: var(--text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cardTitle {
+  @include text-bodySmall-semi-bold;
+  color: var(--text-color-primary);
+}
+
+.cardBadge,
+.balancePill,
+.inputAsset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  border-radius: 999px;
+  padding: size_unit(1) size_unit(1.5);
+  background: var(--light-mode-light-grey, rgba(0, 0, 0, 0.04));
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+}
+
+.cardBadge,
+.balancePill {
+  @include text-form-label($weight: 600);
+}
+
+.inputAsset {
+  @include text-bodySmall-semi-bold;
+}
+
+.destinationValue {
+  @include text-address($size: 15px, $weight: 600, $height: size_unit(3));
+  color: var(--text-color-primary);
+  word-break: break-word;
+}
+
+.destinationHint,
+.fieldHint,
+.noticeCard,
+.availableText {
+  @include text-bodySmall-medium;
+  color: var(--text-color-secondary);
+}
+
+.formCard {
+  display: flex;
+  flex-direction: column;
+  gap: size_unit(2);
+}
+
+.depositInputRow {
+  display: flex;
+  align-items: center;
+  gap: size_unit(1.5);
+}
+
+.inputSideControls {
+  display: flex;
+  align-items: center;
+  gap: size_unit(1);
+  flex-shrink: 0;
+}
+
+.depositInput {
   flex: 1;
-  white-space: nowrap; /* Prevent text wrapping */
+  min-width: 0;
+
+  :global(.ant-input) {
+    @include text-body-semi-bold;
+    border-radius: size_unit(2.5);
+    min-height: size_unit(6);
+    padding: 0 size_unit(2);
+    color: var(--text-color-primary);
+  }
+}
+
+.maxButton {
+  flex-shrink: 0;
+  min-width: 64px;
+}
+
+.depositMeta {
+  display: flex;
+  flex-direction: column;
+  gap: size_unit(0.5);
+}
+
+.passwordWrapper {
+  margin-top: size_unit(0.5);
+}
+
+.errorText {
+  @include text-bodySmall-semi-bold;
+  color: var(--light-mode-red, #d64545);
+}
+
+.withdrawNotice {
+  margin: -2px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(49, 150, 71, 0.08);
+  border: 1px solid rgba(49, 150, 71, 0.24);
+  color: var(--text-color-secondary);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.noticeCard {
+  padding: size_unit(2.5) size_unit(3);
+  background: var(--light-mode-light-grey, rgba(0, 0, 0, 0.015));
+}
+
+.drawerFooter {
+  display: flex;
+  flex-direction: column;
+  gap: size_unit(1.5);
+}
+
+.footerButton {
+  width: 100%;
+}
+
+.disabled {
+  .text {
+    color: var(--text-color-secondary);
+  }
+
+  .bannerSubtitle {
+    color: var(--text-color-secondary);
+  }
+
+  .statusPill {
+    color: var(--text-color-secondary);
+  }
+}
+
+@media (max-width: 720px) {
+  .banner {
+    align-items: center;
+    padding: 10px;
+  }
+
+  .statePanelHeader {
+    flex-direction: column;
+  }
+
+  .depositInputRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .inputSideControls,
+  .formCardHeader,
+  .cardHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .inputAsset {
+    align-self: flex-start;
+  }
+}
+
+@keyframes midgardPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

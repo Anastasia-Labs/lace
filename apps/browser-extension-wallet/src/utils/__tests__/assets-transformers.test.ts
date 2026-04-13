@@ -459,5 +459,24 @@ describe('Testing assets transformers', () => {
         }).sortBy.metadataName
       ).toEqual(undefined);
     });
+
+    test('should build a fallback token row when asset metadata is missing', () => {
+      mockCalculateAssetBalance.mockReset();
+      mockCalculateAssetBalance.mockReturnValue('2');
+
+      const fallbackResult = assetsTransformers.assetTransformer({
+        ...params,
+        token: undefined
+      });
+
+      expect(fallbackResult.id).toEqual(key);
+      expect(fallbackResult.name).toEqual(key);
+      expect(fallbackResult.ticker).toEqual('-');
+      expect(fallbackResult.policyId).toEqual(undefined);
+      expect(fallbackResult.fingerprint).toEqual(undefined);
+      expect(fallbackResult.sortBy.fingerprint).toEqual(undefined);
+      expect(mockCalculateAssetBalance.mock.calls[0][0]).toEqual(BigInt(2));
+      expect(mockCalculateAssetBalance.mock.calls[0][1]).toBeUndefined();
+    });
   });
 });

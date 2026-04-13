@@ -18,10 +18,18 @@ type TransactionDetailsProxyProps = {
   activityInfo: TransactionActivityDetail;
   direction: TxDirection;
   status: ActivityStatus;
+  canOpenExternalHashLink: boolean;
   amountTransformer: (amount: string) => string;
 };
 export const TransactionDetailsProxy = withAddressBookContext(
-  ({ name, activityInfo, direction, status, amountTransformer }: TransactionDetailsProxyProps): ReactElement => {
+  ({
+    name,
+    activityInfo,
+    direction,
+    status,
+    canOpenExternalHashLink,
+    amountTransformer
+  }: TransactionDetailsProxyProps): ReactElement => {
     const analytics = useAnalyticsContext();
     const {
       inMemoryWallet,
@@ -76,11 +84,13 @@ export const TransactionDetailsProxy = withAddressBookContext(
       [isIncomingTransaction, addrOutputs, addrInputs, walletInfo.addresses]
     );
 
-    const handleOpenExternalHashLink = () => {
-      analytics.sendEventToPostHog(PostHogAction.ActivityActivityDetailTransactionHashClick);
-      const externalLink = `${explorerBaseUrl}/${hash}`;
-      externalLink && status === ActivityStatus.SUCCESS && openExternalLink(externalLink);
-    };
+    const handleOpenExternalHashLink = canOpenExternalHashLink
+      ? () => {
+          analytics.sendEventToPostHog(PostHogAction.ActivityActivityDetailTransactionHashClick);
+          const externalLink = `${explorerBaseUrl}/${hash}`;
+          externalLink && status === ActivityStatus.SUCCESS && openExternalLink(externalLink);
+        }
+      : undefined;
 
     return (
       // eslint-disable-next-line react/jsx-pascal-case

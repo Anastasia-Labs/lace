@@ -200,6 +200,7 @@ export interface UseWalletManager {
    * provider properties or configurations without switching the wallet.
    */
   reloadWallet: () => Promise<void>;
+  setMidgardModeAndReload: (enabled: boolean) => Promise<boolean>;
   addAccount: (props: WalletManagerAddAccountProps) => Promise<void>;
   getMnemonic: (passphrase: Uint8Array) => Promise<string[]>;
   getSharedWalletExtendedPublicKey: (passphrase: Uint8Array) => Promise<Wallet.Cardano.Cip1854ExtendedAccountPublicKey>;
@@ -372,7 +373,10 @@ export const useWalletManager = (): UseWalletManager => {
     setCardanoCoin,
     setAddressesDiscoveryCompleted,
     manageAccountsWallet,
-    setManageAccountsWallet
+    setManageAccountsWallet,
+    setMidgardMode,
+    startMidgardModeSwitch,
+    failMidgardModeSwitch
   } = useWalletStore();
   const [settings, updateAppSettings] = useAppSettingsContext();
   const {
@@ -1144,6 +1148,22 @@ export const useWalletManager = (): UseWalletManager => {
     }
   }, [backgroundService]);
 
+  const setMidgardModeAndReload = useCallback(
+    async (enabled: boolean): Promise<boolean> => {
+      startMidgardModeSwitch(enabled);
+
+      try {
+        const { effectiveEnabled } = await backgroundService.setMidgardModeAndReload(enabled);
+        setMidgardMode(effectiveEnabled);
+        return effectiveEnabled;
+      } catch (error) {
+        failMidgardModeSwitch(error instanceof Error ? error.message : 'Failed to switch Midgard mode');
+        throw error;
+      }
+    },
+    [backgroundService, failMidgardModeSwitch, setMidgardMode, startMidgardModeSwitch]
+  );
+
   /**
    * Deactivates current wallet and activates it again with the new network
    */
@@ -1432,6 +1452,7 @@ export const useWalletManager = (): UseWalletManager => {
     saveHardwareWallet,
     deleteWallet,
     reloadWallet,
+    setMidgardModeAndReload,
     switchNetwork,
     walletManager,
     walletRepository,

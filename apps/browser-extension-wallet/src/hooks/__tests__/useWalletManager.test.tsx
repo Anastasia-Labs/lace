@@ -133,7 +133,8 @@ const render = () =>
       backgroundService: {
         clearBackgroundStorage: jest.fn(),
         getBackgroundStorage: jest.fn().mockResolvedValue({ activeBlockchain: 'cardano' }),
-        setBackgroundStorage: jest.fn()
+        setBackgroundStorage: jest.fn(),
+        setMidgardModeAndReload: jest.fn().mockResolvedValue({ effectiveEnabled: true })
       } as unknown as BackgroundServiceAPIProviderProps['value']
     })
   }).result.current;
@@ -991,6 +992,74 @@ describe('Testing useWalletManager hook', () => {
           networkId: expect.anything()
         })
       });
+    });
+  });
+
+  describe('setMidgardModeAndReload', () => {
+    test('marks Midgard as active only after the background reload completes', async () => {
+      const startMidgardModeSwitch = jest.fn();
+      const setMidgardMode = jest.fn();
+      const failMidgardModeSwitch = jest.fn();
+      const setIsBitcoinWallet = jest.fn();
+      const setMidgardModeAndReload = jest.fn().mockResolvedValue({ effectiveEnabled: true });
+
+      jest.spyOn(stores, 'useWalletStore').mockImplementation(() => ({
+        startMidgardModeSwitch,
+        setMidgardMode,
+        failMidgardModeSwitch,
+        setIsBitcoinWallet,
+        ...walletDisplayInfoMockData
+      }));
+
+      const { result } = renderHook(() => useWalletManager(), {
+        wrapper: getWrapper({
+          backgroundService: {
+            clearBackgroundStorage: jest.fn(),
+            getBackgroundStorage: jest.fn().mockResolvedValue({ activeBlockchain: 'cardano' }),
+            setBackgroundStorage: jest.fn(),
+            setMidgardModeAndReload
+          } as unknown as BackgroundServiceAPIProviderProps['value']
+        })
+      });
+
+      await expect(result.current.setMidgardModeAndReload(true)).resolves.toBe(true);
+
+      expect(startMidgardModeSwitch).toHaveBeenCalledWith(true);
+      expect(setMidgardModeAndReload).toHaveBeenCalledWith(true);
+      expect(setMidgardMode).toHaveBeenCalledWith(true);
+      expect(failMidgardModeSwitch).not.toHaveBeenCalled();
+    });
+
+    test('captures activation failures without changing the effective mode', async () => {
+      const startMidgardModeSwitch = jest.fn();
+      const setMidgardMode = jest.fn();
+      const failMidgardModeSwitch = jest.fn();
+      const setIsBitcoinWallet = jest.fn();
+
+      jest.spyOn(stores, 'useWalletStore').mockImplementation(() => ({
+        startMidgardModeSwitch,
+        setMidgardMode,
+        failMidgardModeSwitch,
+        setIsBitcoinWallet,
+        ...walletDisplayInfoMockData
+      }));
+
+      const { result } = renderHook(() => useWalletManager(), {
+        wrapper: getWrapper({
+          backgroundService: {
+            clearBackgroundStorage: jest.fn(),
+            getBackgroundStorage: jest.fn().mockResolvedValue({ activeBlockchain: 'cardano' }),
+            setBackgroundStorage: jest.fn(),
+            setMidgardModeAndReload: jest.fn().mockRejectedValue(new Error('reload failed'))
+          } as unknown as BackgroundServiceAPIProviderProps['value']
+        })
+      });
+
+      await expect(result.current.setMidgardModeAndReload(true)).rejects.toThrow('reload failed');
+
+      expect(startMidgardModeSwitch).toHaveBeenCalledWith(true);
+      expect(setMidgardMode).not.toHaveBeenCalled();
+      expect(failMidgardModeSwitch).toHaveBeenCalledWith('reload failed');
     });
   });
 });

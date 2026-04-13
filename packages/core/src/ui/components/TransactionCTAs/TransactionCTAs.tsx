@@ -13,6 +13,7 @@ export interface TransactionCTAsProps {
   onCoSignClick?: () => void;
   popupView?: boolean;
   buttonClassName?: string;
+  isSendDisabled?: boolean;
 }
 
 export const TransactionCTAs = ({
@@ -20,7 +21,8 @@ export const TransactionCTAs = ({
   onSendClick,
   onCoSignClick,
   popupView = false,
-  buttonClassName
+  buttonClassName,
+  isSendDisabled = false
 }: TransactionCTAsProps): React.ReactElement => {
   const { t } = useTranslation();
   return (
@@ -29,7 +31,14 @@ export const TransactionCTAs = ({
         <ArrowDiagonalDown className={classnames(styles.icon, !popupView && styles.iconInExpandedView)} />
         {t('core.transactionCtas.receive')}
       </Button>
-      <Button className={buttonClassName} block onClick={onSendClick} color="gradient" data-testid="send-button">
+      <Button
+        className={buttonClassName}
+        block
+        onClick={onSendClick}
+        color="gradient"
+        data-testid="send-button"
+        disabled={isSendDisabled}
+      >
         <ArrowDiagonalUp className={classnames(styles.icon, !popupView && styles.iconInExpandedView)} />
         {t('core.transactionCtas.send')}
       </Button>

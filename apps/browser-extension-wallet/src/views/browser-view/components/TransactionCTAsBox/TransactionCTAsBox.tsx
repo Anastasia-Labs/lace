@@ -11,12 +11,14 @@ import {
   useOpenTransactionDrawer
 } from '../../features/send-transaction';
 import { useWalletStore } from '@stores';
+import { getMidgardSendBlockReason } from '@stores/slices/midgard-slice';
 import { useOpenReceiveDrawer } from './useOpenReceiveDrawer';
 import { useCurrentBlockchain, Blockchain } from '@src/multichain';
 import { useBitcoinSendDrawer } from '@views/browser/components/TransactionCTAsBox/useBitcoinSendDrawer';
 
 export const TransactionCTAsBox = (): React.ReactElement => {
-  const { isSharedWallet } = useWalletStore();
+  const { isSharedWallet, isInMemoryWallet, isMidgardEnabled, midgardActivationStatus, midgardHealthStatus } =
+    useWalletStore();
   const analytics = useAnalytics();
   const openSendTransactionDrawer = useOpenTransactionDrawer({ content: DrawerContent.SEND_TRANSACTION });
   const openCoSignTransactionDrawer = useOpenTransactionDrawer({ content: DrawerContent.CO_SIGN_TRANSACTION });
@@ -24,6 +26,14 @@ export const TransactionCTAsBox = (): React.ReactElement => {
   const { setTriggerPoint } = useAnalyticsSendFlowTriggerPoint();
   const openReceiveDrawer = useOpenReceiveDrawer();
   const { blockchain } = useCurrentBlockchain();
+  const midgardSendBlockReason = getMidgardSendBlockReason({
+    isMidgardEnabled,
+    midgardActivationStatus,
+    midgardHealthStatus,
+    isInMemoryWallet,
+    isSharedWallet
+  });
+  const isSendDisabled = blockchain === Blockchain.Cardano && !!midgardSendBlockReason;
 
   const openReceive = () => {
     openReceiveDrawer();
@@ -50,6 +60,7 @@ export const TransactionCTAsBox = (): React.ReactElement => {
       onSendClick={openSend}
       onReceiveClick={openReceive}
       onCoSignClick={isSharedWallet ? onCoSignClick : undefined}
+      isSendDisabled={isSendDisabled}
     />
   );
 };

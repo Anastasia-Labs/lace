@@ -11,6 +11,7 @@ module.exports = createJestConfig({
     '^[.]*(?!.*\\.component\\.svg$).*\\.svg*$': '<rootDir>/test/__mocks__/fileMock.js',
     'component\\.svg(\\?v=\\d+\\.d+\\.\\d+)?$': '<rootDir>/test/__mocks__/svgMock.js',
     '^lodash-es$': 'lodash',
+    '^usb$': '<rootDir>/test/__mocks__/usb.js',
     '^webextension-polyfill': '<rootDir>/test/__mocks__/fileMock.js',
     // https://github.com/LedgerHQ/ledger-live/issues/763
     '@ledgerhq/devices/hid-framing': '@ledgerhq/devices/lib/hid-framing',

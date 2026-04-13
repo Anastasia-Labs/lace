@@ -8,6 +8,7 @@ const mockGetFormattedAmount = jest.fn();
 import * as txTransformers from '../common-tx-transformer';
 import * as txHistoryTransformers from '../tx-history-transformer';
 import { Wallet } from '@lace/cardano';
+import { DelegationActivityType, TransactionActivityType } from '@lace/core';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { cardanoCoin } from '@src/utils/constants';
@@ -210,5 +211,121 @@ describe('Testing txHistoryTransformer function', () => {
     inspectTxTypeSpy.mockRestore();
     getTxDirectionSpy.mockRestore();
     getFormattedFiatAmountSpy.mockRestore();
+  });
+
+  test('should label Midgard deposit bridge transactions', async () => {
+    mockGetFormattedAmount.mockReset();
+    mockGetFormattedAmount.mockReturnValueOnce('NaN ADA').mockReturnValueOnce('10.00 ADA');
+    const inspectTxTypeSpy = jest
+      .spyOn(txInspection, 'inspectTxType')
+      .mockResolvedValue(DelegationActivityType.delegationRegistration);
+    const inspectTxValuesSpy = jest
+      .spyOn(txInspection, 'inspectTxValues')
+      .mockResolvedValueOnce({ coins: BigInt('10000000') } as Wallet.Cardano.Value);
+    const depositTx = {
+      ...txHistory,
+      body: {
+        ...txHistory.body,
+        mint: new Map([
+          [Wallet.Cardano.AssetId(`${Wallet.MIDGARD_LAYER1_POLICY_IDS.deposit}41`), BigInt(1)]
+        ]) as Wallet.Cardano.TokenMap
+      }
+    };
+
+    const result: any = await txHistoryTransformers.txHistoryTransformer({
+      tx: depositTx,
+      walletAddresses: [
+        {
+          address: Wallet.Cardano.PaymentAddress(
+            'addr_test1qpeg0n942wz3kx7vhmcgwa9t58r9spp4x2x32vfllm4ddkj2he0ldswjwtvp7drsjqmyzugmjhmypdhu3vez5rkkuj5s74q4yw'
+          ),
+          rewardAccount: Wallet.Cardano.RewardAccount(
+            'stake_test1uq7g7kqeucnqfweqzgxk3dw34e8zg4swnc7nagysug2mm4cm77jrx'
+          )
+        }
+      ] as Wallet.KeyManagement.GroupedAddress[],
+      date,
+      fiatCurrency: {
+        code: currencyCode.USD,
+        symbol: '$'
+      },
+      fiatPrice: 1,
+      environmentName: 'Preprod',
+      protocolParameters: { poolDeposit: 3, stakeKeyDeposit: 2 } as Wallet.ProtocolParameters,
+      cardanoCoin,
+      resolveInput: () => Promise.resolve(null)
+    });
+
+    expect(result[0].label).toBe('Midgard L2 Deposit');
+    expect(result[0].type).toBe(TransactionActivityType.outgoing);
+    expect(result[0].direction).toBe('Outgoing');
+    expect(result[0].amount).toBe('10.00 ADA');
+    expect(result[0].fiatAmount).toBe('10.00 USD');
+    expect(inspectTxValuesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        direction: 'Outgoing'
+      })
+    );
+
+    inspectTxTypeSpy.mockRestore();
+    inspectTxValuesSpy.mockRestore();
+  });
+
+  test('should override Midgard layer2 activity amount with Midgard value delta', async () => {
+    mockGetFormattedAmount.mockReset();
+    mockGetFormattedAmount.mockReturnValueOnce('9999.99 ADA').mockReturnValueOnce('2.00 ADA');
+    const inspectTxTypeSpy = jest
+      .spyOn(txInspection, 'inspectTxType')
+      .mockResolvedValueOnce(TransactionActivityType.outgoing);
+    const inspectTxValuesSpy = jest
+      .spyOn(txInspection, 'inspectTxValues')
+      .mockResolvedValueOnce({ coins: BigInt('2000000') } as Wallet.Cardano.Value);
+
+    const layer2Tx = {
+      ...txHistory,
+      blockHeader: {
+        blockNo: 1,
+        hash: Wallet.Cardano.BlockId('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+        slot: 42
+      },
+      midgardTxProvenance: Wallet.MidgardTxProvenance.Layer2Native
+    };
+
+    const result: any = await txHistoryTransformers.txHistoryTransformer({
+      tx: layer2Tx,
+      walletAddresses: [
+        {
+          address: Wallet.Cardano.PaymentAddress(
+            'addr_test1qpeg0n942wz3kx7vhmcgwa9t58r9spp4x2x32vfllm4ddkj2he0ldswjwtvp7drsjqmyzugmjhmypdhu3vez5rkkuj5s74q4yw'
+          ),
+          rewardAccount: Wallet.Cardano.RewardAccount(
+            'stake_test1uq7g7kqeucnqfweqzgxk3dw34e8zg4swnc7nagysug2mm4cm77jrx'
+          )
+        }
+      ] as Wallet.KeyManagement.GroupedAddress[],
+      date,
+      fiatCurrency: {
+        code: currencyCode.USD,
+        symbol: '$'
+      },
+      fiatPrice: 1,
+      environmentName: 'Preprod',
+      protocolParameters: { poolDeposit: 3, stakeKeyDeposit: 2 } as Wallet.ProtocolParameters,
+      cardanoCoin,
+      resolveInput: () => Promise.resolve(null)
+    });
+
+    expect(result[0].label).toBeUndefined();
+    expect(result[0].direction).toBe('Outgoing');
+    expect(result[0].amount).toBe('2.00 ADA');
+    expect(result[0].fiatAmount).toBe('2.00 USD');
+    expect(inspectTxValuesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        direction: 'Outgoing'
+      })
+    );
+
+    inspectTxTypeSpy.mockRestore();
+    inspectTxValuesSpy.mockRestore();
   });
 });

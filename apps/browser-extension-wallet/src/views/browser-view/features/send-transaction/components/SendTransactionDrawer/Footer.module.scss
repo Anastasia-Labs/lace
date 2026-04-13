@@ -10,13 +10,17 @@ $btnPurple: var(--primary-default, #7f5af0);
   text-align: center;
   border-radius: size_unit(2);
   height: size_unit(6);
+
+  @media (max-height: 820px) {
+    height: size_unit(5.5);
+  }
 }
 
 .footer {
   background-color: var(--color-white);
   @extend %flex-column;
   justify-content: center;
-  gap: size_unit(2);
+  gap: 12px;
 
   button.nextStep {
     @extend %btn-label;
@@ -67,11 +71,26 @@ $btnPurple: var(--primary-default, #7f5af0);
   }
 
   @media (max-width: $breakpoint-popup) {
-    gap: size_unit(1);
+    gap: 8px;
+  }
+
+  @media (max-height: 820px) {
+    gap: 8px;
   }
 }
 
 .footerLeft {
   @extend %flex-row;
   justify-content: flex-end;
+}
+
+.statusHint {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-color-secondary);
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: size_unit(2);
+  background: rgba(49, 150, 71, 0.08);
+  border: 1px solid rgba(49, 150, 71, 0.18);
 }

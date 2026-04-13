@@ -26,10 +26,10 @@ export const SideMenu = (): React.ReactElement => {
   const analytics = useAnalyticsContext();
   const posthog = usePostHogClientContext();
   const isDappExplorerEnabled = posthog.isFeatureFlagEnabled(ExperimentName.DAPP_EXPLORER);
-  const { isSharedWallet, environmentName } = useWalletStore();
+  const { isSharedWallet, environmentName, isMidgardEnabled } = useWalletStore();
   const { blockchain } = useCurrentBlockchain();
 
-  const isVotingCenterEnabled = !!GOV_TOOLS_URLS[environmentName];
+  const isVotingCenterEnabled = !!GOV_TOOLS_URLS[environmentName] && !isMidgardEnabled;
 
   const [currentHoveredItem, setCurrentHoveredItem] = useState<MenuItemList | undefined>();
 
@@ -78,7 +78,7 @@ export const SideMenu = (): React.ReactElement => {
   const onMouseLeaveItem = () => setCurrentHoveredItem(undefined);
 
   const excludeItems: MenuItemList[] = [];
-  if (isSharedWallet) {
+  if (isSharedWallet || isMidgardEnabled) {
     excludeItems.push(MenuItemList.STAKING);
   }
   if (!isDappExplorerEnabled) {

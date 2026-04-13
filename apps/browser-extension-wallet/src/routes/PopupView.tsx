@@ -76,15 +76,26 @@ export const PopupView = (): React.ReactElement => {
   }, [isWalletLocked, backgroundServices, currentChain, chainName, cardanoWallet]);
 
   const fatalError = useFatalError();
+  const bypassSyncGate = process.env.BYPASS_FATAL_ERRORS === 'true';
   const isLoaded = useMemo(
     () =>
-      !!cardanoWallet &&
-      !!walletDisplayInfo &&
-      walletInfo &&
-      walletState &&
-      inMemoryWallet &&
+      bypassSyncGate
+        ? !!cardanoWallet && !!walletDisplayInfo && !!inMemoryWallet
+        : !!cardanoWallet &&
+          !!walletDisplayInfo &&
+          walletInfo &&
+          walletState &&
+          inMemoryWallet &&
+          initialHdDiscoveryCompleted,
+    [
+      bypassSyncGate,
+      cardanoWallet,
+      walletInfo,
+      walletState,
+      inMemoryWallet,
       initialHdDiscoveryCompleted,
-    [cardanoWallet, walletInfo, walletState, inMemoryWallet, initialHdDiscoveryCompleted, walletDisplayInfo]
+      walletDisplayInfo
+    ]
   );
   useEffect(() => {
     if (isLoaded || fatalError) {
