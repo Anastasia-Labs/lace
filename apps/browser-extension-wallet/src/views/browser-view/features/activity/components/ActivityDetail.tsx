@@ -131,10 +131,18 @@ export const ActivityDetail = ({ price }: ActivityDetailProps): ReactElement => 
   const canOpenExternalHashLink =
     resolvedMidgardActivity &&
     Wallet.getMidgardTxProvenance(resolvedMidgardActivity) !== Wallet.MidgardTxProvenance.Layer2Native;
+  const pendingMidgardLabel = getPendingMidgardActivityLabel(resolvedMidgardActivity, environmentName);
+  const confirmedMidgardLabel = getMidgardActivityLabel(resolvedMidgardActivity, environmentName);
+  const hashLabel =
+    resolvedMidgardActivity &&
+    Wallet.getMidgardTxProvenance(resolvedMidgardActivity) !== Wallet.MidgardTxProvenance.Layer2Native &&
+    (pendingMidgardLabel || confirmedMidgardLabel)
+      ? 'Cardano Transaction ID'
+      : undefined;
   const name =
-    activityInfo.status === ActivityStatus.PENDING
-      ? getPendingMidgardActivityLabel(resolvedMidgardActivity, environmentName) ?? t('core.activityDetails.sending')
-      : getMidgardActivityLabel(resolvedMidgardActivity, environmentName) ?? t(getTypeLabel(activityInfo.type));
+    activityInfo.status === ActivityStatus.PENDING || (activityInfo.status === ActivityStatus.ERROR && pendingMidgardLabel)
+      ? pendingMidgardLabel ?? t('core.activityDetails.sending')
+      : confirmedMidgardLabel ?? t(getTypeLabel(activityInfo.type));
 
   const amountTransformer = (ada: string) =>
     `${Wallet.util.convertAdaToFiat({ ada, fiat: price?.cardano?.price })} ${fiatCurrency?.code}`;
@@ -163,13 +171,14 @@ export const ActivityDetail = ({ price }: ActivityDetailProps): ReactElement => 
   }
 
   return (
-    <TransactionDetailsProxy
-      name={name}
-      activityInfo={activityInfo}
-      direction={activityDetail.direction}
-      status={currentTransactionStatus}
-      canOpenExternalHashLink={!!canOpenExternalHashLink}
-      amountTransformer={amountTransformer}
-    />
+      <TransactionDetailsProxy
+        name={name}
+        activityInfo={activityInfo}
+        direction={activityDetail.direction}
+        status={currentTransactionStatus}
+        canOpenExternalHashLink={!!canOpenExternalHashLink}
+        amountTransformer={amountTransformer}
+        hashLabel={hashLabel}
+      />
   );
 };

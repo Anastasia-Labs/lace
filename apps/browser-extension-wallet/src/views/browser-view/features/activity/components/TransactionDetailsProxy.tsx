@@ -20,6 +20,7 @@ type TransactionDetailsProxyProps = {
   status: ActivityStatus;
   canOpenExternalHashLink: boolean;
   amountTransformer: (amount: string) => string;
+  hashLabel?: string;
 };
 export const TransactionDetailsProxy = withAddressBookContext(
   ({
@@ -28,7 +29,8 @@ export const TransactionDetailsProxy = withAddressBookContext(
     direction,
     status,
     canOpenExternalHashLink,
-    amountTransformer
+    amountTransformer,
+    hashLabel
   }: TransactionDetailsProxyProps): ReactElement => {
     const analytics = useAnalyticsContext();
     const {
@@ -97,6 +99,7 @@ export const TransactionDetailsProxy = withAddressBookContext(
       <TransactionDetails
         name={name}
         hash={hash}
+        hashLabel={hashLabel}
         status={status}
         includedDate={includedUtcDate}
         includedTime={includedUtcTime}

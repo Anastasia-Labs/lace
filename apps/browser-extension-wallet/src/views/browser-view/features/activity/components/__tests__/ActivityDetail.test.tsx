@@ -47,16 +47,30 @@ const depositAssetId = Wallet.Cardano.AssetId(`${Wallet.MIDGARD_LAYER1_POLICY_ID
 const createActivity = ({
   status = ActivityStatus.SUCCESS,
   includeBridgeMint = true,
+  includeBridgeRegistrationCertificate = false,
   provenance
 }: {
   status?: ActivityStatus;
   includeBridgeMint?: boolean;
+  includeBridgeRegistrationCertificate?: boolean;
   provenance?: Wallet.MidgardTxProvenance;
 }) => {
   const activity = {
     id: Wallet.Cardano.TransactionId('a'.repeat(64)),
     body: {
-      mint: includeBridgeMint ? (new Map([[depositAssetId, BigInt(1)]]) as Wallet.Cardano.TokenMap) : undefined
+      mint: includeBridgeMint ? (new Map([[depositAssetId, BigInt(1)]]) as Wallet.Cardano.TokenMap) : undefined,
+      certificates: includeBridgeRegistrationCertificate
+        ? [
+            ({
+              __typename: Wallet.Cardano.CertificateType.Registration,
+              deposit: BigInt(2000000),
+              stakeCredential: {
+                type: Wallet.Cardano.CredentialType.KeyHash,
+                hash: Wallet.Crypto.Hash28ByteBase16('0d94e174732ef9aae73f395ab44507bfa983d65023c11a951f0c32e4')
+              }
+            } as unknown as Wallet.Cardano.Certificate)
+          ]
+        : undefined
     },
     ...(provenance ? { midgardTxProvenance: provenance } : {})
   } as Wallet.Cardano.HydratedTx;
@@ -81,13 +95,20 @@ const createActivity = ({
 const renderActivityDetail = async ({
   status = ActivityStatus.SUCCESS,
   includeBridgeMint = true,
+  includeBridgeRegistrationCertificate = false,
   provenance
 }: {
   status?: ActivityStatus;
   includeBridgeMint?: boolean;
+  includeBridgeRegistrationCertificate?: boolean;
   provenance?: Wallet.MidgardTxProvenance;
 } = {}) => {
-  const { activity, activityInfo } = createActivity({ status, includeBridgeMint, provenance });
+  const { activity, activityInfo } = createActivity({
+    status,
+    includeBridgeMint,
+    includeBridgeRegistrationCertificate,
+    provenance
+  });
   const getActivityDetail = jest.fn().mockResolvedValue(activityInfo);
 
   mockUseWalletStore.mockReturnValue({
@@ -112,6 +133,7 @@ const renderActivityDetail = async ({
   await waitFor(() => expect(mockTransactionDetailsProxy).toHaveBeenCalled());
   return mockTransactionDetailsProxy.mock.calls.at(-1)?.[0] as {
     canOpenExternalHashLink: boolean;
+    hashLabel?: string;
     name: string;
     status: ActivityStatus;
   };
@@ -170,6 +192,7 @@ describe('Testing Transaction details data function', () => {
       provenance: Wallet.MidgardTxProvenance.Layer1Bridge
     });
 
+    expect(props.hashLabel).toBe('Cardano Transaction ID');
     expect(props.name).toBe('Midgard L2 Deposit');
     expect(props.status).toBe(ActivityStatus.SUCCESS);
     expect(props.canOpenExternalHashLink).toBe(true);
@@ -181,9 +204,22 @@ describe('Testing Transaction details data function', () => {
       status: ActivityStatus.PENDING
     });
 
+    expect(props.hashLabel).toBe('Cardano Transaction ID');
     expect(props.name).toBe('Depositing');
     expect(props.status).toBe(ActivityStatus.PENDING);
     expect(props.canOpenExternalHashLink).toBe(true);
+  });
+
+  test('renders the Midgard deposit label when bridge provenance is present without mint metadata', async () => {
+    const props = await renderActivityDetail({
+      includeBridgeMint: false,
+      includeBridgeRegistrationCertificate: true,
+      provenance: Wallet.MidgardTxProvenance.Layer1Bridge
+    });
+
+    expect(props.hashLabel).toBe('Cardano Transaction ID');
+    expect(props.name).toBe('Midgard L2 Deposit');
+    expect(props.status).toBe(ActivityStatus.SUCCESS);
   });
 
   test('disables external explorer links for native Midgard layer 2 activity details', async () => {
@@ -192,6 +228,7 @@ describe('Testing Transaction details data function', () => {
       provenance: Wallet.MidgardTxProvenance.Layer2Native
     });
 
+    expect(props.hashLabel).toBeUndefined();
     expect(props.name).toBe('core.activityDetails.sent');
     expect(props.canOpenExternalHashLink).toBe(false);
   });

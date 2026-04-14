@@ -8,6 +8,7 @@ import SwitchIcon from '@src/assets/icons/switch.component.svg';
 import styles from './MidgardBanner.module.scss';
 import { Wallet } from '@lace/cardano';
 import { getMidgardUrl, MIDGARD_LAST_CARDANO_BALANCE_STORAGE_KEY, parseStoredLovelace } from '@src/utils/midgard-url';
+import { getMidgardDepositEventIdFromTxCbor } from '@src/utils/midgard-deposit-event-id';
 import { withSignTxConfirmation } from '@lib/wallet-api-ui';
 import { signExternalCardanoTx } from '@lib/sign-external-cardano-tx';
 import { buildMidgardDeposit, getMidgardDepositFundingSummary, submitSignedCardanoTx } from './deposit';
@@ -493,21 +494,30 @@ export const MidgardBanner = (): React.ReactElement => {
         chainName: depositContext.chainName,
         signedTxCbor
       });
+      const eventId = getMidgardDepositEventIdFromTxCbor(signedTxCbor);
+      const broadcastRequestedAt = new Date().toISOString();
 
       addMidgardPendingDeposit({
+        accountIndex: cardanoWallet.source.account.accountIndex,
         txId,
+        broadcastRequestedAt,
+        cardanoTxId: txId,
+        chainName: depositContext.chainName,
         txCbor: signedTxCbor,
         address: depositContext.l2Address,
-        createdAt: new Date().toISOString()
+        createdAt: broadcastRequestedAt,
+        eventId,
+        trackingStatus: 'broadcast_requested',
+        walletId: cardanoWallet.source.wallet.walletId
       });
 
       resetDepositModalState();
 
       toast.notify({
-        text: `Deposit submitted on Cardano. TX: ${txId.slice(
+        text: `Cardano broadcast requested for deposit. TX: ${txId.slice(
           0,
           TX_HASH_PREVIEW_LENGTH
-        )}... Track it in Activity while it confirms.`,
+        )}... Activity will update after Cardano or Midgard observes it.`,
         withProgressBar: true,
         icon: SwitchIcon
       });
@@ -721,7 +731,7 @@ export const MidgardBanner = (): React.ReactElement => {
             <div className={styles.actionIntro}>
               <span className={styles.actionTitle}>Midgard actions</span>
               <span className={styles.actionHint}>
-                Deposit to fund Midgard, then use the normal Send flow on Midgard Layer 2.
+                Deposit funds to your Midgard wallet. 
               </span>
               {isSharedWallet && (
                 <span className={styles.errorText}>Deposit is currently unavailable for shared wallets.</span>
@@ -891,7 +901,7 @@ export const MidgardBanner = (): React.ReactElement => {
           )}
 
           <div className={styles.noticeCard}>
-            The transaction will appear in Activity as <strong>Depositing</strong> until Cardano confirms it.
+            Activity will show this deposit as <strong>Broadcast requested</strong> until Cardano or Midgard observes it.
           </div>
         </div>
       </Drawer>

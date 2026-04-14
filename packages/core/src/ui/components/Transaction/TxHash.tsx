@@ -6,12 +6,13 @@ import styles from '../ActivityDetail/TransactionDetails.module.scss';
 import { CopiableHash } from './CopiableHash';
 
 type TxHashProps = {
+  hashLabel?: string;
   success: boolean;
   sending: boolean;
   openLink: TransactionDetailsProps['handleOpenExternalHashLink'];
 } & Pick<TransactionDetailsProps, 'hash'>;
 
-export const TxHash = ({ hash, success, sending, openLink }: TxHashProps): React.ReactElement => {
+export const TxHash = ({ hash, hashLabel, success, sending, openLink }: TxHashProps): React.ReactElement => {
   const { t } = useTranslation();
   const hashComponent = useMemo(
     () => (sending ? <CopiableHash hash={hash} copiedText={t('core.activityDetails.copiedToClipboard')} /> : hash),
@@ -22,7 +23,7 @@ export const TxHash = ({ hash, success, sending, openLink }: TxHashProps): React
     <div data-testid="tx-hash" className={styles.hashContainer}>
       <div className={cn(styles.title, styles.labelWidth)}>
         <div className={styles.hashLabel} data-testid="tx-hash-title">
-          {t('core.activityDetails.transactionID')}
+          {hashLabel ?? t('core.activityDetails.transactionID')}
         </div>
       </div>
       <div

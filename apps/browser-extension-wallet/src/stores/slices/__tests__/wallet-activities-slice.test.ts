@@ -260,6 +260,116 @@ describe('Testing wallet activities slice', () => {
     );
   });
 
+  test('should keep pending Midgard deposits labeled as Depositing when chain history resolves them without mint metadata', async () => {
+    const sendingAddress = mockWalletInfoTestnet.addresses[0].address;
+    const pendingDepositTx: Wallet.Cardano.Tx = {
+      id: Wallet.Cardano.TransactionId('956779250fac75430360c1a6efbaed77ceea49fa4d2aff988cadcc2294ce41f0'),
+      body: {
+        inputs: [
+          {
+            txId: Wallet.Cardano.TransactionId('4123d70f66414cc921f6ffc29a899aafc7137a99a0fd453d6b200863ef5702d6'),
+            index: 1
+          }
+        ],
+        outputs: [
+          {
+            address: Wallet.Cardano.PaymentAddress(
+              'addr_test1qz7xvvc30qghk00sfpzcfhsw3s2nyn7my0r8hq8c2jj47zsxu2hyfhlkwuxupa9d5085eunq2qywy7hvmvej456flkns6sjg2v'
+            ),
+            value: {
+              coins: BigInt('1000000')
+            }
+          }
+        ],
+        certificates: [
+          ({
+            __typename: Wallet.Cardano.CertificateType.Registration,
+            deposit: BigInt(2000000),
+            stakeCredential: REGISTRATION_STAKE_CREDENTIAL
+          } as unknown as Wallet.Cardano.Certificate)
+        ],
+        fee: BigInt('1000000'),
+        validityInterval: {
+          invalidBefore: Wallet.Cardano.Slot(1),
+          invalidHereafter: Wallet.Cardano.Slot(INVALID_HEREAFTER_SLOT)
+        }
+      },
+      witness: {
+        signatures: new Map([
+          [
+            Wallet.Crypto.Ed25519PublicKeyHex('6199186adb51974690d7247d2646097d2c62763b767b528816fb7ed3f9f55d39'),
+            Wallet.Crypto.Ed25519SignatureHex(
+              '709f937c4ce152c81f8406c03279ff5a8556a12a8657e40a578eaaa6223d2e6a2fece39733429e3ec73a6c798561b5c2d47d82224d656b1d964cfe8b5fdffe09'
+            )
+          ]
+        ])
+      }
+    };
+    const pendingDepositTxCbor = Serialization.TxCBOR.serialize(pendingDepositTx);
+    const chainHistoryProvider = {
+      ...createEmptyChainHistoryProvider(),
+      transactionsByHashes: jest.fn().mockResolvedValue([
+        {
+          ...pendingDepositTx,
+          blockHeader: {
+            blockNo: Wallet.Cardano.BlockNo(1),
+            hash: Wallet.Cardano.BlockId('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+            slot: Wallet.Cardano.Slot(1)
+          },
+          index: 0,
+          midgardTxProvenance: Wallet.MidgardTxProvenance.Layer1Bridge
+        } as unknown as Wallet.Cardano.HydratedTx
+      ])
+    } as unknown as Wallet.ChainHistoryProvider;
+
+    const { walletActivities } = await mapWalletActivities(
+      {
+        ...mockWalletState,
+        addresses: mockWalletInfoTestnet.addresses
+      },
+      {
+        fiatCurrency: { code: currencyCode.USD, symbol: '$' },
+        cardanoFiatPrice: 1
+      },
+      {
+        assetProvider: mockBlockchainProviders().assetProvider,
+        assetDetails: undefined,
+        cardanoCoin,
+        chainHistoryProvider,
+        environmentName: 'Preprod',
+        inputResolver: {
+          resolveInput: jest.fn().mockResolvedValue({
+            address: sendingAddress,
+            value: { coins: BigInt('3000000') }
+          })
+        },
+        isMidgardEnabled: true,
+        isSharedWallet: false,
+        midgardPendingActivities: [
+          {
+            schemaVersion: 1,
+            txId: pendingDepositTx.id.toString(),
+            txCbor: pendingDepositTxCbor,
+            txFormat: 'cardano-legacy',
+            address: sendingAddress.toString(),
+            createdAt: new Date().toISOString(),
+            kind: 'deposit'
+          }
+        ],
+        setRewardsActivityDetail: jest.fn(),
+        setTransactionActivityDetail: jest.fn()
+      }
+    );
+
+    expect(walletActivities[FIRST_ACTIVITY_GROUP_INDEX].items[FIRST_ACTIVITY_ITEM_INDEX]).toEqual(
+      expect.objectContaining({
+        direction: 'Outgoing',
+        label: 'Depositing',
+        type: 'outgoing'
+      })
+    );
+  });
+
   test('should filter out non-midgard layer1 history while keeping bridge and midgard l2 txs in midgard mode', async () => {
     const sendingAddress = mockWalletInfoTestnet.addresses[0].address;
     const plainLayer1TxId = Wallet.Cardano.TransactionId(
@@ -349,6 +459,93 @@ describe('Testing wallet activities slice', () => {
           label: 'Midgard L2 Deposit',
           amount: expect.not.stringContaining('NaN'),
           fiatAmount: expect.not.stringContaining('NaN')
+        })
+      ])
+    );
+  });
+
+  test('should backfill Midgard deposit history from plain Cardano history while keeping non-deposit Cardano txs hidden', async () => {
+    const sendingAddress = mockWalletInfoTestnet.addresses[0].address;
+    const plainLayer1TxId = Wallet.Cardano.TransactionId(
+      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    );
+    const depositTxId = Wallet.Cardano.TransactionId(
+      'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+    );
+    const midgardLayer2TxId = Wallet.Cardano.TransactionId(
+      'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
+    );
+
+    const plainLayer1Tx = {
+      ...mockWalletState.transactions.history[0],
+      id: plainLayer1TxId
+    } as Wallet.Cardano.HydratedTx;
+
+    const supplementalDepositTx = {
+      ...mockWalletState.transactions.history[0],
+      id: depositTxId,
+      body: {
+        ...mockWalletState.transactions.history[0].body,
+        mint: new Map([[PENDING_DEPOSIT_ASSET_ID, BigInt(1)]]) as Wallet.Cardano.TokenMap
+      }
+    } as Wallet.Cardano.HydratedTx;
+
+    const midgardLayer2Tx = {
+      ...mockWalletState.transactions.history[0],
+      id: midgardLayer2TxId,
+      blockHeader: {
+        blockNo: 17,
+        hash: Wallet.Cardano.BlockId('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'),
+        slot: 123_456
+      },
+      midgardTxProvenance: Wallet.MidgardTxProvenance.Layer2Native
+    } as Wallet.Cardano.HydratedTx;
+
+    const { walletActivities } = await mapWalletActivities(
+      {
+        ...mockWalletState,
+        addresses: mockWalletInfoTestnet.addresses,
+        transactions: {
+          ...mockWalletState.transactions,
+          history: [plainLayer1Tx, midgardLayer2Tx]
+        }
+      },
+      {
+        fiatCurrency: { code: currencyCode.USD, symbol: '$' },
+        cardanoFiatPrice: 1
+      },
+      {
+        assetProvider: mockBlockchainProviders().assetProvider,
+        assetDetails: undefined,
+        cardanoCoin,
+        chainHistoryProvider: mockBlockchainProviders().chainHistoryProvider,
+        environmentName: 'Preprod',
+        inputResolver: {
+          resolveInput: jest.fn().mockResolvedValue({
+            address: sendingAddress,
+            value: { coins: BigInt('3000000') }
+          })
+        },
+        isMidgardEnabled: true,
+        isSharedWallet: false,
+        midgardPendingActivities: [],
+        setRewardsActivityDetail: jest.fn(),
+        setTransactionActivityDetail: jest.fn(),
+        supplementalCardanoDepositHistory: [supplementalDepositTx]
+      }
+    );
+
+    const flattenedActivities = walletActivities.flatMap(({ items }) => items);
+    const renderedIds = flattenedActivities.map(({ id }) => id);
+
+    expect(renderedIds).toContain(depositTxId.toString());
+    expect(renderedIds).toContain(midgardLayer2TxId.toString());
+    expect(renderedIds).not.toContain(plainLayer1TxId.toString());
+    expect(flattenedActivities).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: depositTxId.toString(),
+          label: 'Midgard L2 Deposit'
         })
       ])
     );

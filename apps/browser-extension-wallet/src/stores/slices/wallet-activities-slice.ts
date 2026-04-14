@@ -23,7 +23,8 @@ import {
   AssetActivityItemProps,
   AssetActivityListProps,
   ConwayEraCertificatesTypes,
-  DelegationActivityType
+  DelegationActivityType,
+  TransactionActivityType
 } from '@lace/core';
 import { CurrencyInfo, TxDirections } from '@src/types';
 import { getTxDirection, inspectTxType } from '@src/utils/tx-inspection';
@@ -39,11 +40,18 @@ import {
   SliceCreator
 } from '../types';
 import { getAssetsInformation } from '@src/utils/get-assets-information';
+import {
+  enrichTransactionsWithMidgardDepositProvenance,
+  loadMidgardCardanoDepositHistory
+} from '@src/utils/midgard-cardano-deposit-history';
 import { rewardHistoryTransformer } from '@src/views/browser-view/features/activity/helpers/reward-history-transformer';
 import { isKeyHashAddress } from '@cardano-sdk/wallet';
 import { ObservableWalletState } from '@hooks/useWalletState';
 import { IBlockchainProvider } from './blockchain-provider-slice';
 import {
+  MIDGARD_PENDING_BROADCAST_NOT_OBSERVED_LABEL,
+  MIDGARD_PENDING_BROADCAST_REQUESTED_LABEL,
+  MIDGARD_PENDING_TRACKING_STATUS_KEY,
   getPendingMidgardActivityGroupTitle,
   getPendingMidgardActivityLabel,
   isMidgardActivity,
@@ -85,8 +93,54 @@ type extendedDelegationActivityType =
   | ConwayEraCertificatesTypes.Registration
   | ConwayEraCertificatesTypes.Unregistration;
 
+type MidgardPendingActivityDetailTx = (Wallet.Cardano.HydratedTx | Wallet.Cardano.Tx) & {
+  [MIDGARD_PENDING_TRACKING_STATUS_KEY]?: MidgardPendingActivity['trackingStatus'];
+};
+
 type DelegationActivityItemProps = Omit<ExtendedActivityProps, 'type'> & {
   type: extendedDelegationActivityType;
+};
+
+const getPendingMidgardActivityFallbacks = (
+  pendingActivity: MidgardPendingActivity
+): Pick<TransformedTransactionActivity, 'direction' | 'type'> & { label?: string } => {
+  if (pendingActivity.kind === 'deposit') {
+    if (pendingActivity.trackingStatus === 'broadcast_not_observed') {
+      return {
+        direction: TxDirections.Outgoing,
+        label: MIDGARD_PENDING_BROADCAST_NOT_OBSERVED_LABEL,
+        type: TransactionActivityType.outgoing
+      };
+    }
+
+    if (pendingActivity.trackingStatus === 'broadcast_requested') {
+      return {
+        direction: TxDirections.Outgoing,
+        label: MIDGARD_PENDING_BROADCAST_REQUESTED_LABEL,
+        type: TransactionActivityType.outgoing
+      };
+    }
+  }
+
+  switch (pendingActivity.kind) {
+    case 'deposit':
+      return {
+        direction: TxDirections.Outgoing,
+        label: 'Depositing',
+        type: TransactionActivityType.outgoing
+      };
+    case 'withdrawal':
+      return {
+        direction: TxDirections.Incoming,
+        label: 'Withdrawing',
+        type: TransactionActivityType.incoming
+      };
+    default:
+      return {
+        direction: TxDirections.Outgoing,
+        type: TransactionActivityType.outgoing
+      };
+  }
 };
 
 const isDelegationActivity = (activity: ExtendedActivityProps): activity is DelegationActivityItemProps =>
@@ -151,6 +205,26 @@ const getDependencyIdentity = (dependency: object | undefined): string => {
   return nextIdentity.toString();
 };
 
+const mergeTransactionsById = (
+  primaryTransactions: Wallet.Cardano.HydratedTx[],
+  secondaryTransactions: Wallet.Cardano.HydratedTx[] = []
+): Wallet.Cardano.HydratedTx[] => {
+  const transactionsById = new Map<string, Wallet.Cardano.HydratedTx>();
+
+  for (const transaction of primaryTransactions) {
+    transactionsById.set(transaction.id.toString(), transaction);
+  }
+
+  for (const transaction of secondaryTransactions) {
+    const txId = transaction.id.toString();
+    if (!transactionsById.has(txId)) {
+      transactionsById.set(txId, transaction);
+    }
+  }
+
+  return [...transactionsById.values()];
+};
+
 export const mapWalletActivities = memoize(
   async (
     {
@@ -173,14 +247,17 @@ export const mapWalletActivities = memoize(
       isMidgardEnabled,
       environmentName,
       isSharedWallet,
-      inputResolver
+      inputResolver,
+      supplementalCardanoDepositHistory = []
     }: Pick<UISlice['walletUI'], 'cardanoCoin'> &
       Pick<ActivityDetailSlice, 'setRewardsActivityDetail' | 'setTransactionActivityDetail'> &
       Pick<AssetDetailsSlice, 'assetDetails'> &
       Pick<IBlockchainProvider, 'chainHistoryProvider' | 'inputResolver'> &
       Pick<IBlockchainProvider, 'assetProvider'> &
       Pick<MidgardSlice, 'midgardPendingActivities' | 'isMidgardEnabled'> &
-      Pick<WalletInfoSlice, 'environmentName' | 'isSharedWallet'>
+      Pick<WalletInfoSlice, 'environmentName' | 'isSharedWallet'> & {
+        supplementalCardanoDepositHistory?: Wallet.Cardano.HydratedTx[];
+      }
   ) => {
     const epochRewardsMapper = (earnedEpoch: Wallet.Cardano.EpochNo, rewards: Reward[]): ExtendedActivityProps => {
       const spendableEpoch = (earnedEpoch + REWARD_SPENDABLE_DELAY_EPOCHS) as Wallet.Cardano.EpochNo;
@@ -339,24 +416,38 @@ export const mapWalletActivities = memoize(
         resolveInput,
         isSharedWallet
       });
+      const resolvedTxWithTrackingStatus: MidgardPendingActivityDetailTx = {
+        ...resolvedTx,
+        [MIDGARD_PENDING_TRACKING_STATUS_KEY]: pendingActivity.trackingStatus
+      };
+      const fallbackMidgardActivity = getPendingMidgardActivityFallbacks(pendingActivity);
       const label =
-        pendingActivity.kind === 'send' ? undefined : getPendingMidgardActivityLabel(resolvedTx, environmentName);
+        pendingActivity.kind === 'send'
+          ? undefined
+          : getPendingMidgardActivityLabel(resolvedTxWithTrackingStatus, environmentName) ?? fallbackMidgardActivity.label;
       const formattedDate =
         pendingActivity.kind === 'send'
           ? undefined
-          : getPendingMidgardActivityGroupTitle(resolvedTx, environmentName);
+          : getPendingMidgardActivityGroupTitle(resolvedTxWithTrackingStatus, environmentName);
+      const pendingActivityStatus =
+        pendingActivity.trackingStatus === 'broadcast_not_observed' ? ActivityStatus.ERROR : ActivityStatus.PENDING;
 
       return transformedTransaction.map((transformedTx) => ({
         ...transformedTx,
+        ...(pendingActivity.kind !== 'send' && {
+          direction: fallbackMidgardActivity.direction,
+          type: fallbackMidgardActivity.type
+        }),
         id: pendingActivity.txId,
         ...(label && { label }),
         ...(formattedDate && { formattedDate }),
+        status: pendingActivityStatus,
         onClick: () => {
           if (sendAnalytics) sendAnalytics();
           setTransactionActivityDetail({
-            activity: resolvedTx,
+            activity: resolvedTxWithTrackingStatus,
             direction: transformedTx.direction,
-            status: ActivityStatus.PENDING,
+            status: pendingActivityStatus,
             type: transformedTx.type
           });
         }
@@ -383,9 +474,12 @@ export const mapWalletActivities = memoize(
      * Sanitizes historical transactions data
      */
     const getHistoricalTransactions = async () => {
-      const visibleHistory = isMidgardEnabled
-        ? transactions.history.filter((tx) => isMidgardActivity(tx, environmentName))
+      const combinedHistory = isMidgardEnabled
+        ? mergeTransactionsById(transactions.history, supplementalCardanoDepositHistory)
         : transactions.history;
+      const visibleHistory = isMidgardEnabled
+        ? combinedHistory.filter((tx) => isMidgardActivity(tx, environmentName))
+        : combinedHistory;
 
       const filtered =
         !assetDetails || assetDetails?.id === cardanoCoin.id
@@ -549,10 +643,12 @@ export const mapWalletActivities = memoize(
       inputResolver,
       isSharedWallet,
       midgardPendingActivities,
-      isMidgardEnabled
+      isMidgardEnabled,
+      supplementalCardanoDepositHistory = []
     }
   ) => {
     const historyKey = transactions.history.map(({ id }) => id).join('');
+    const supplementalHistoryKey = supplementalCardanoDepositHistory.map(({ id }) => id).join('');
     const inFlightKey = transactions.outgoing.inFlight.map(({ id, submittedAt }) => `${id}_${submittedAt}`).join('');
     const signedKey = transactions.outgoing.signed?.map(({ tx: { id } }) => id).join('') ?? '';
     const addressesKey = addresses.map(({ address }) => address.toString()).join('|');
@@ -572,7 +668,7 @@ export const mapWalletActivities = memoize(
       )
       .join('');
 
-    return `${historyKey}_${inFlightKey}_${signedKey}_${midgardPendingKey}_${assetInfo.size}_${rewardsHistory.all.length}_${cardanoFiatPrice}_${fiatCurrency.code}_${cardanoCoin?.id}_${assetDetails?.id}_${addressesKey}_${environmentName}_${isSharedWallet}_${isMidgardEnabled}_${providerKey}`;
+    return `${historyKey}_${supplementalHistoryKey}_${inFlightKey}_${signedKey}_${midgardPendingKey}_${assetInfo.size}_${rewardsHistory.all.length}_${cardanoFiatPrice}_${fiatCurrency.code}_${cardanoCoin?.id}_${assetDetails?.id}_${addressesKey}_${environmentName}_${isSharedWallet}_${isMidgardEnabled}_${providerKey}`;
   }
 );
 
@@ -610,8 +706,41 @@ export const createGetWalletActivities = ({
     }
 
     try {
+      const historyWithMidgardDeposits =
+        environmentName && walletState.transactions.history.length > 0
+          ? await enrichTransactionsWithMidgardDepositProvenance({
+              environmentName,
+              transactions: walletState.transactions.history
+            }).catch((error) => {
+              logger.warn('Failed to enrich Cardano history with confirmed Midgard deposits', error);
+              return walletState.transactions.history;
+            })
+          : walletState.transactions.history;
+      const walletStateWithMidgardDepositHistory =
+        historyWithMidgardDeposits === walletState.transactions.history
+          ? walletState
+          : {
+              ...walletState,
+              transactions: {
+                ...walletState.transactions,
+                history: historyWithMidgardDeposits
+              }
+            };
+      const supplementalCardanoDepositHistory =
+        isMidgardEnabled && environmentName
+          ? await loadMidgardCardanoDepositHistory({
+              addresses: walletState.addresses,
+              chainName: environmentName
+            }).catch(
+              (error) => {
+                logger.warn('Failed to load supplemental Cardano Midgard deposit history', error);
+                return [];
+              }
+            )
+          : [];
+
       const { walletActivities, activitiesCount } = await mapWalletActivitiesImpl(
-        walletState,
+        walletStateWithMidgardDepositHistory,
         { fiatCurrency, cardanoFiatPrice, sendAnalytics, withLimitedRewardsHistory },
         {
           assetProvider,
@@ -624,7 +753,8 @@ export const createGetWalletActivities = ({
           midgardPendingActivities,
           isMidgardEnabled,
           environmentName,
-          isSharedWallet
+          isSharedWallet,
+          supplementalCardanoDepositHistory
         }
       );
 

@@ -271,6 +271,68 @@ describe('Testing txHistoryTransformer function', () => {
     inspectTxValuesSpy.mockRestore();
   });
 
+  test('should label Midgard deposit bridge transactions from provenance when mint metadata is unavailable', async () => {
+    mockGetFormattedAmount.mockReset();
+    mockGetFormattedAmount.mockReturnValueOnce('NaN ADA').mockReturnValueOnce('10.00 ADA');
+    const inspectTxTypeSpy = jest
+      .spyOn(txInspection, 'inspectTxType')
+      .mockResolvedValue(DelegationActivityType.delegationRegistration);
+    const inspectTxValuesSpy = jest
+      .spyOn(txInspection, 'inspectTxValues')
+      .mockResolvedValueOnce({ coins: BigInt('10000000') } as Wallet.Cardano.Value);
+    const depositTx = {
+      ...txHistory,
+      midgardTxProvenance: Wallet.MidgardTxProvenance.Layer1Bridge,
+      body: {
+        ...txHistory.body,
+        mint: undefined as Wallet.Cardano.TokenMap | undefined,
+        certificates: [
+          ({
+            __typename: Wallet.Cardano.CertificateType.Registration,
+            deposit: BigInt(2000000),
+            stakeCredential: {
+              type: Wallet.Cardano.CredentialType.KeyHash,
+              hash: Wallet.Crypto.Hash28ByteBase16('0d94e174732ef9aae73f395ab44507bfa983d65023c11a951f0c32e4')
+            }
+          } as unknown as Wallet.Cardano.Certificate)
+        ]
+      }
+    } as Wallet.Cardano.HydratedTx;
+
+    const result: any = await txHistoryTransformers.txHistoryTransformer({
+      tx: depositTx,
+      walletAddresses: [
+        {
+          address: Wallet.Cardano.PaymentAddress(
+            'addr_test1qpeg0n942wz3kx7vhmcgwa9t58r9spp4x2x32vfllm4ddkj2he0ldswjwtvp7drsjqmyzugmjhmypdhu3vez5rkkuj5s74q4yw'
+          ),
+          rewardAccount: Wallet.Cardano.RewardAccount(
+            'stake_test1uq7g7kqeucnqfweqzgxk3dw34e8zg4swnc7nagysug2mm4cm77jrx'
+          )
+        }
+      ] as Wallet.KeyManagement.GroupedAddress[],
+      date,
+      fiatCurrency: {
+        code: currencyCode.USD,
+        symbol: '$'
+      },
+      fiatPrice: 1,
+      environmentName: 'Preprod',
+      protocolParameters: { poolDeposit: 3, stakeKeyDeposit: 2 } as Wallet.ProtocolParameters,
+      cardanoCoin,
+      resolveInput: () => Promise.resolve(null)
+    });
+
+    expect(result[0].label).toBe('Midgard L2 Deposit');
+    expect(result[0].type).toBe(TransactionActivityType.outgoing);
+    expect(result[0].direction).toBe('Outgoing');
+    expect(result[0].amount).toBe('10.00 ADA');
+    expect(result[0].fiatAmount).toBe('10.00 USD');
+
+    inspectTxTypeSpy.mockRestore();
+    inspectTxValuesSpy.mockRestore();
+  });
+
   test('should override Midgard layer2 activity amount with Midgard value delta', async () => {
     mockGetFormattedAmount.mockReset();
     mockGetFormattedAmount.mockReturnValueOnce('9999.99 ADA').mockReturnValueOnce('2.00 ADA');

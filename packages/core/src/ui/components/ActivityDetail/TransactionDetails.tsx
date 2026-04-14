@@ -18,6 +18,7 @@ const displayMetadataMsg = (value: any[]): string => value?.find((val: any) => v
 
 export const TransactionDetails = ({
   hash,
+  hashLabel,
   name,
   status,
   headerDescription,
@@ -91,6 +92,7 @@ export const TransactionDetails = ({
         <Transaction.Block>
           <Transaction.TxHash
             hash={hash}
+            hashLabel={hashLabel}
             success={isSuccess}
             sending={isSending}
             openLink={handleOpenExternalHashLink}

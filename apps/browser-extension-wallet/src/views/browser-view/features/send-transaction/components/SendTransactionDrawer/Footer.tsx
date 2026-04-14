@@ -284,16 +284,20 @@ export const Footer = withAddressBookContext(
         }
 
         if (activeAddress) {
+          const createdAt = new Date().toISOString();
           addMidgardPendingActivity({
+            accountIndex: cardanoWallet?.source.account?.accountIndex,
             ...(cardanoPreviewCbor && { cardanoPreviewCbor }),
-            txId,
             ...(cardanoTxId && { cardanoTxId }),
+            chainName: environmentName,
+            createdAt,
             nativeTxCbor: signedTxCbor,
             address: activeAddress,
-            createdAt: new Date().toISOString(),
             kind: 'send',
             schemaVersion: 2,
-            txFormat: 'midgard-native'
+            txFormat: 'midgard-native',
+            txId,
+            walletId: cardanoWallet?.source.wallet?.walletId
           });
         }
 

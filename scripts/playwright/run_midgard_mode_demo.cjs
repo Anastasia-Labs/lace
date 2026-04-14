@@ -37,6 +37,7 @@ const popupViewport = {
   height: parseDimension(process.env.PW_VIEWPORT_HEIGHT, popupViewportDefaults.height)
 };
 const shouldUseNativeWindowSizing = stopAfterLogin;
+const contextViewport = shouldUseNativeWindowSizing ? null : popupViewport;
 const remoteDebuggingPortRaw = process.env.PW_REMOTE_DEBUG_PORT || (stopAfterLogin ? '9222' : '');
 const remoteDebuggingPort = parseDimension(remoteDebuggingPortRaw, 0);
 const validMnemonicLengths = new Set([12, 15, 24]);
@@ -1484,7 +1485,7 @@ const verifySendDrawerFooterVisible = async ({ page, context, extensionId, artif
     context = await chromium.launchPersistentContext(userDataDir, {
       headless: false,
       ...(browserExecutablePath ? { executablePath: browserExecutablePath } : {}),
-      viewport: popupViewport,
+      viewport: contextViewport,
       ...(shouldRecordVideo
         ? {
             recordVideo: {
@@ -1536,6 +1537,7 @@ const verifySendDrawerFooterVisible = async ({ page, context, extensionId, artif
     if (remoteDebuggingPort > 0) console.log(`remote_debugging_port=${remoteDebuggingPort}`);
     if (shouldUseNativeWindowSizing) {
       console.log(`native_window_size=${popupViewport.width}x${popupViewport.height}`);
+      console.log('native_window_viewport=enabled');
     }
 
     const ready = await waitForWalletReady({ context, extensionId, mnemonicWords });

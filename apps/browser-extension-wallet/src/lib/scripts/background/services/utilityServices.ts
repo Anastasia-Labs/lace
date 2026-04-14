@@ -30,6 +30,7 @@ import { logger } from '@lace/common';
 import { POPUP_WINDOW_NAMI_TITLE } from '@utils/constants';
 import { catchAndBrandExtensionApiError } from '@utils/catch-and-brand-extension-api-error';
 import { initCardanoTokenPrices } from './cardanoTokenPrices';
+import { initializeMidgardPendingActivitiesTracker } from './midgardPendingActivities';
 
 export const requestMessage$ = new Subject<Message>();
 export const backendFailures$ = new BehaviorSubject(0);
@@ -300,6 +301,7 @@ export const exposeBackgroundService = ({
   setMidgardModeAndReload: (enabled: boolean) => Promise<{ effectiveEnabled: boolean }>;
 }): void => {
   const coinPrices = initializeCoinPrices(wallet$);
+  initializeMidgardPendingActivitiesTracker();
   const updatePrices = () => {
     fetchAdaPrice(coinPrices);
     fetchBitcoinPrice(coinPrices);

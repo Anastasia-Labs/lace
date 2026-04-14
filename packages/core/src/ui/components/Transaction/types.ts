@@ -58,6 +58,7 @@ export interface TransactionMetadataProps {
 
 export interface TransactionDetailsProps {
   hash?: string;
+  hashLabel?: string;
   name: string;
   status?: ActivityStatus;
   /**

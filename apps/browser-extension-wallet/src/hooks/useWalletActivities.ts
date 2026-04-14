@@ -1,5 +1,6 @@
 import { useCurrencyStore } from '@providers';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { logger } from '@lace/common';
 import { useFetchCoinPrice } from './useFetchCoinPrice';
 import { WalletActivitiesSlice, useWalletStore } from '@src/stores';
 import noop from 'lodash/noop';
@@ -10,6 +11,15 @@ import { UseTxHistoryLoader, useTxHistoryLoader } from './useTxHistoryLoader';
 import { useAsyncSwitchMap } from '@hooks/useAsyncSwitchMap';
 import { ObservableWalletState } from './useWalletState';
 import { MidgardPendingActivity, midgardPendingActivityMatchesTxIds } from '@stores/slices/midgard-slice';
+import {
+  enrichTransactionsWithMidgardDepositProvenance,
+  loadMidgardCardanoDepositHistory
+} from '@src/utils/midgard-cardano-deposit-history';
+import {
+  getStoredMidgardPendingActivities,
+  readMidgardPendingActivitiesStorageChange
+} from '@src/utils/midgard-pending-activities-storage';
+import { Storage, storage } from 'webextension-polyfill';
 
 type UseWalletActivitiesProps = {
   sendAnalytics: () => void;
@@ -58,6 +68,102 @@ const usePruneConfirmedMidgardPendingActivities = ({
   }, [confirmedMidgardPendingActivityIds, removeMidgardPendingActivities]);
 };
 
+const useSyncMidgardPendingActivities = ({
+  setMidgardPendingActivities
+}: {
+  setMidgardPendingActivities: (pendingActivities: MidgardPendingActivity[]) => void;
+}) => {
+  useEffect(() => {
+    let alive = true;
+
+    void getStoredMidgardPendingActivities()
+      .then((pendingActivities) => {
+        if (alive) {
+          setMidgardPendingActivities(pendingActivities);
+        }
+      })
+      .catch((error) => {
+        logger.warn('Failed to load Midgard pending activities from extension storage', error);
+      });
+
+    const handleStorageChange = (changes: Storage.StorageAreaOnChangedChangesType, areaName: string) => {
+      const pendingActivities = readMidgardPendingActivitiesStorageChange(changes, areaName);
+      if (pendingActivities === undefined) {
+        return;
+      }
+
+      setMidgardPendingActivities(pendingActivities);
+    };
+
+    storage.onChanged.addListener(handleStorageChange);
+
+    return () => {
+      alive = false;
+      storage.onChanged.removeListener(handleStorageChange);
+    };
+  }, [setMidgardPendingActivities]);
+};
+
+const useMidgardCardanoDepositHistory = ({
+  walletState,
+  environmentName,
+  isMidgardEnabled
+}: {
+  walletState: ObservableWalletState | null;
+  environmentName?: Wallet.ChainName;
+  isMidgardEnabled: boolean;
+}): {
+  isReady: boolean;
+  supplementalCardanoDepositHistory: Wallet.Cardano.HydratedTx[];
+} => {
+  const [supplementalCardanoDepositHistory, setSupplementalCardanoDepositHistory] = useState<
+    Wallet.Cardano.HydratedTx[] | undefined
+  >([]);
+
+  const addressesKey = useMemo(
+    () => walletState?.addresses.map(({ address }) => address.toString()).join('|') ?? '',
+    [walletState?.addresses]
+  );
+
+  useEffect(() => {
+    let alive = true;
+
+    if (!isMidgardEnabled || !environmentName || !walletState || addressesKey.length === 0) {
+      setSupplementalCardanoDepositHistory([]);
+      return () => {
+        alive = false;
+      };
+    }
+
+    setSupplementalCardanoDepositHistory(undefined);
+
+    void loadMidgardCardanoDepositHistory({
+      addresses: walletState.addresses,
+      chainName: environmentName
+    })
+      .then((history) => {
+        if (alive) {
+          setSupplementalCardanoDepositHistory(history);
+        }
+      })
+      .catch((error) => {
+        logger.warn('Failed to load supplemental Cardano Midgard deposit history', error);
+        if (alive) {
+          setSupplementalCardanoDepositHistory([]);
+        }
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [addressesKey, environmentName, isMidgardEnabled, walletState]);
+
+  return {
+    isReady: supplementalCardanoDepositHistory !== undefined,
+    supplementalCardanoDepositHistory: supplementalCardanoDepositHistory ?? []
+  };
+};
+
 export const useWalletActivities = ({
   sendAnalytics,
   withLimitedRewardsHistory
@@ -71,10 +177,12 @@ export const useWalletActivities = ({
     activitiesCount,
     walletState,
     midgardPendingActivities,
+    setMidgardPendingActivities,
     removeMidgardPendingActivities
   } = useWalletStore();
 
   const cardanoFiatPrice = priceResult?.cardano?.price;
+  useSyncMidgardPendingActivities({ setMidgardPendingActivities });
   usePruneConfirmedMidgardPendingActivities({
     walletState,
     midgardPendingActivities,
@@ -134,9 +242,10 @@ export const useWalletActivitiesPaginated = ({
     setRewardsActivityDetail,
     assetDetails,
     blockchainProvider: { assetProvider, chainHistoryProvider, inputResolver },
-    midgardPendingActivities,
-    removeMidgardPendingActivities,
     environmentName,
+    midgardPendingActivities,
+    setMidgardPendingActivities,
+    removeMidgardPendingActivities,
     isMidgardEnabled,
     isSharedWallet
   } = useWalletStore();
@@ -144,11 +253,18 @@ export const useWalletActivitiesPaginated = ({
   const cardanoFiatPrice = priceResult?.cardano?.price;
 
   const pageSize = useItemsPageSize();
+  useSyncMidgardPendingActivities({ setMidgardPendingActivities });
   usePruneConfirmedMidgardPendingActivities({
     walletState,
     midgardPendingActivities,
     removeMidgardPendingActivities
   });
+  const { isReady: isSupplementalCardanoDepositHistoryReady, supplementalCardanoDepositHistory } =
+    useMidgardCardanoDepositHistory({
+      walletState,
+      environmentName,
+      isMidgardEnabled
+    });
 
   const { loadMore: txHistoryLoaderLoadMore, retry, error, loadedHistory } = useTxHistoryLoader(pageSize);
 
@@ -174,7 +290,8 @@ export const useWalletActivitiesPaginated = ({
       midgardPendingActivities,
       environmentName,
       isMidgardEnabled,
-      isSharedWallet
+      isSharedWallet,
+      supplementalCardanoDepositHistory
     }),
     [
       assetProvider,
@@ -187,33 +304,50 @@ export const useWalletActivitiesPaginated = ({
       midgardPendingActivities,
       environmentName,
       isMidgardEnabled,
-      isSharedWallet
+      isSharedWallet,
+      supplementalCardanoDepositHistory
     ]
   );
 
   const mapActivities = useCallback(
     async (history: Wallet.Cardano.HydratedTx[]) => {
       const { transactions } = walletState;
+      const historyWithMidgardDeposits =
+        environmentName && history.length > 0
+          ? await enrichTransactionsWithMidgardDepositProvenance({
+              environmentName,
+              transactions: history
+            }).catch((error) => {
+              logger.warn('Failed to enrich paginated Cardano history with confirmed Midgard deposits', error);
+              return history;
+            })
+          : history;
 
       return (
         await mapWalletActivities(
           {
             ...walletState,
-            transactions: { ...transactions, history }
+            transactions: { ...transactions, history: historyWithMidgardDeposits }
           },
           fetchActivitiesProps,
           fetchActivitiesDeps
         )
       ).walletActivities;
     },
-    [fetchActivitiesDeps, fetchActivitiesProps, walletState]
+    [environmentName, fetchActivitiesDeps, fetchActivitiesProps, walletState]
   );
 
   const handleUpdateWalletActivities = useAsyncSwitchMap(mapActivities, setWalletActivities);
 
   useEffect(() => {
     (async () => {
-      if (loadedHistory?.transactions === undefined || !fiatCurrency || !cardanoFiatPrice) return;
+      if (
+        loadedHistory?.transactions === undefined ||
+        !fiatCurrency ||
+        !cardanoFiatPrice ||
+        !isSupplementalCardanoDepositHistoryReady
+      )
+        return;
 
       handleUpdateWalletActivities(loadedHistory.transactions.slice(0, currentPage * pageSize));
     })();
@@ -224,6 +358,7 @@ export const useWalletActivitiesPaginated = ({
     fetchActivitiesProps,
     fiatCurrency,
     handleUpdateWalletActivities,
+    isSupplementalCardanoDepositHistoryReady,
     loadedHistory?.transactions,
     mapActivities,
     pageSize,

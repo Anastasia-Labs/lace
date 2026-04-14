@@ -2,7 +2,6 @@ import { Serialization } from '@cardano-sdk/core';
 import { getProviders } from '@lib/scripts/background/config';
 import { Wallet } from '@lace/cardano';
 import { AnyBip32Wallet, AnyWallet, WalletType } from '@cardano-sdk/web-extension';
-import { mergeWitnesses } from '@src/utils/merge-witnesses';
 import { signingCoordinator } from './wallet-api-ui';
 
 export interface ExternalCardanoSigningRequestContext {
@@ -61,8 +60,12 @@ export const signExternalCardanoTx = async ({
     }
   );
 
-  return Serialization.TxCBOR.serialize({
-    ...coreTx,
-    witness: mergeWitnesses(coreTx.witness, { signatures })
-  });
+  const mergedSignatures = new Map([...(coreTx.witness?.signatures ?? []), ...signatures]);
+  const witnessSet = transaction.witnessSet();
+  witnessSet.setVkeys(
+    Serialization.CborSet.fromCore([...mergedSignatures.entries()], Serialization.VkeyWitness.fromCore)
+  );
+  transaction.setWitnessSet(witnessSet);
+
+  return transaction.toCbor();
 };

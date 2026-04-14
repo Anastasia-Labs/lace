@@ -24,4 +24,19 @@ describe('midgard-slice helpers', () => {
     ]);
     expect(midgardPendingActivityMatchesTxIds(pendingActivity, ['cardano-preview-hash'])).toBe(true);
   });
+
+  test('does not treat cached deposit event ids as transaction ids', () => {
+    expect(
+      getMidgardPendingActivityTxIds({
+        address: 'addr_test1vr4example',
+        createdAt: new Date('2026-04-13T00:00:00.000Z').toISOString(),
+        eventId: 'd8799fd8799f581c1234ff',
+        kind: 'deposit',
+        schemaVersion: 1,
+        txCbor: '84a40081825820deposit',
+        txFormat: 'cardano-legacy',
+        txId: '23ac62ed8c58a915af6cf93108f6247e94bce379a43668182db2618792661dbf'
+      })
+    ).toEqual(['23ac62ed8c58a915af6cf93108f6247e94bce379a43668182db2618792661dbf']);
+  });
 });

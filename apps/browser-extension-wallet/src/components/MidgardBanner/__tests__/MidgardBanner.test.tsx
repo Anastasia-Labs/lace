@@ -16,6 +16,7 @@ const ADA_LOVELACE_FACTOR = BigInt(1_000_000);
 const mockAddMidgardPendingDeposit = jest.fn();
 const mockBuildMidgardDeposit = jest.fn();
 const mockGetMidgardDepositFundingSummary = jest.fn();
+const mockGetMidgardDepositEventIdFromTxCbor = jest.fn();
 const mockGetMidgardUrl = jest.fn();
 const mockSignExternalCardanoTx = jest.fn();
 const mockSetMidgardHealthDegraded = jest.fn();
@@ -56,6 +57,10 @@ jest.mock('@src/utils/midgard-url', () => ({
     if (!value || !/^\d+$/.test(value)) return undefined;
     return BigInt(value);
   }
+}));
+
+jest.mock('@src/utils/midgard-deposit-event-id', () => ({
+  getMidgardDepositEventIdFromTxCbor: (...args: any[]) => mockGetMidgardDepositEventIdFromTxCbor(...args)
 }));
 
 jest.mock('@lace/common', () => ({
@@ -264,6 +269,7 @@ describe('MidgardBanner', () => {
       totalAvailableCoins: BigInt(8_000_000)
     });
     mockGetMidgardUrl.mockResolvedValue('http://midgard.local');
+    mockGetMidgardDepositEventIdFromTxCbor.mockReturnValue(undefined);
     mockSignExternalCardanoTx.mockResolvedValue('signed-tx-cbor');
     mockWithSignTxConfirmation.mockImplementation(async (action: () => Promise<string>) => await action());
     mockSubmitSignedCardanoTx.mockResolvedValue('abc12345deadbeef');
@@ -361,6 +367,7 @@ describe('MidgardBanner', () => {
   });
 
   test('submits deposit through Midgard build and Cardano L1 submit', async () => {
+    mockGetMidgardDepositEventIdFromTxCbor.mockReturnValue('derived-event-1');
     const { getByTestId, queryByTestId } = render(<MidgardBanner />);
     await waitFor(() => expect(getByTestId('midgard-deposit-action-button')).toBeInTheDocument());
 
@@ -408,6 +415,7 @@ describe('MidgardBanner', () => {
       })
     );
     expect(mockAddMidgardPendingDeposit).toHaveBeenCalledWith({
+      eventId: 'derived-event-1',
       txId: 'abc12345deadbeef',
       txCbor: 'signed-tx-cbor',
       address: walletAddress,

@@ -129,6 +129,7 @@ export const walletStoreMock = async (
     setMidgardHealthHealthy: jest.fn(),
     setMidgardHealthDegraded: jest.fn(),
     resetMidgardHealth: jest.fn(),
+    setMidgardPendingActivities: jest.fn(),
     addMidgardPendingActivity: jest.fn(),
     removeMidgardPendingActivities: jest.fn(),
     addMidgardPendingDeposit: jest.fn(),
